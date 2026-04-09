@@ -1,0 +1,54 @@
+export interface CommissionBalance {
+  date: string;
+  amount: number;
+  debtToRegion?: number;
+}
+
+export interface CommissionItem {
+  inn: string;
+  name: string;
+  kno: string;
+  region: string;
+  regionName: string;
+  balances: CommissionBalance[];
+  commissionStatus?: string;
+  interactionStatus?: string;
+  commissionDate?: string;
+  measures?: boolean;
+  protocolFileName?: string;
+}
+
+export interface CommissionCompanyCard {
+  inn: string;
+  name: string;
+  kno: string;
+  oktmo?: string;
+  address?: string;
+  okved?: string;
+  employeesCount?: number;
+  workersWithDebt?: number;
+  workersDebt?: number;
+  propertiesCount?: number;
+  landCount?: number;
+  transportCount?: number;
+  revenue?: Record<string, number | null>;
+  averageHeadcount?: Record<string, number | null>;
+  balances?: CommissionBalance[];
+  history?: CommissionHistoryItem[];
+}
+
+export interface CommissionHistoryItem {
+  id: string;
+  date: string;
+  username: string;
+  action: string;
+}
+
+export interface CommissionEditForm {
+  commissionStatus: string;
+  interactionStatus: string;
+  commissionDate: string;
+  measures: boolean;
+  note: string;
+  protocolFileName: string;
+}

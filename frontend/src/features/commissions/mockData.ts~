@@ -1,0 +1,158 @@
+import type {
+  CommissionCard,
+  CommissionForm,
+  CommissionItem,
+  CommissionSummaryItem,
+} from '../../types/commission';
+
+export const commissionsSummary: CommissionSummaryItem[] = [
+  { label: 'На контроле', value: '128' },
+  { label: 'Назначено комиссий', value: '42' },
+  { label: 'Погашение после комиссии', value: '18 540 тыс. ₽' },
+  { label: 'Протоколы загружены', value: '37' },
+];
+
+const testBalances = [
+  { date: '2026-03-31', amount: 1820, debtToRegion: 910 },
+  { date: '2026-03-15', amount: 1760, debtToRegion: 890 },
+  { date: '2026-02-28', amount: 1690, debtToRegion: 860 },
+  { date: '2026-02-15', amount: 1640, debtToRegion: 835 },
+  { date: '2026-01-31', amount: 1580, debtToRegion: 810 },
+  { date: '2026-01-15', amount: 1510, debtToRegion: 790 },
+  { date: '2025-12-31', amount: 1490, debtToRegion: 770 },
+];
+
+export const commissionsList: CommissionItem[] = [
+  {
+    inn: '7701234567',
+    name: 'ООО Альфа',
+    region: '77',
+    kno: 'ИФНС № 10',
+    balances: testBalances,
+    commissionStatus: 'Комиссия проведена',
+    interactionStatus: 'Погасит частично',
+    protocolFileName: 'protocol_7701234567.pdf',
+  },
+  {
+    inn: '7802345678',
+    name: 'ООО Нева Трейд',
+    region: '78',
+    kno: 'МИФНС № 11',
+    balances: [
+      { date: '2026-03-31', amount: 920, debtToRegion: 470 },
+      { date: '2026-03-15', amount: 980, debtToRegion: 495 },
+      { date: '2026-02-28', amount: 1040, debtToRegion: 520 },
+      { date: '2026-02-15', amount: 1090, debtToRegion: 548 },
+      { date: '2026-01-31', amount: 1160, debtToRegion: 575 },
+      { date: '2026-01-15', amount: 1190, debtToRegion: 590 },
+      { date: '2025-12-31', amount: 1240, debtToRegion: 615 },
+    ],
+    commissionStatus: 'Неявка на комиссию',
+    interactionStatus: 'Требуется повторный вызов',
+    protocolFileName: 'protocol_7802345678.pdf',
+  },
+  {
+    inn: '5003456789',
+    name: 'АО ТехИнвест',
+    region: '50',
+    kno: 'ИФНС № 5',
+    balances: [
+      { date: '2026-03-31', amount: 2410, debtToRegion: 1220 },
+      { date: '2026-03-15', amount: 2380, debtToRegion: 1200 },
+      { date: '2026-02-28', amount: 2320, debtToRegion: 1170 },
+      { date: '2026-02-15', amount: 2280, debtToRegion: 1145 },
+      { date: '2026-01-31', amount: 2210, debtToRegion: 1115 },
+      { date: '2026-01-15', amount: 2150, debtToRegion: 1080 },
+      { date: '2025-12-31', amount: 2080, debtToRegion: 1040 },
+    ],
+    commissionStatus: 'Не требуется проведение комиссии',
+    interactionStatus: 'Погашен добровольно',
+    protocolFileName: 'protocol_5003456789.pdf',
+  },
+];
+
+export const commissionCardsByInn: Record<string, CommissionCard> = {
+  '7701234567': {
+    inn: '7701234567',
+    name: 'ООО Альфа',
+    region: '77',
+    kno: 'ИФНС № 10',
+    address: 'г. Москва, ул. Примерная, д. 10',
+    director: 'Иванов И.И.',
+    phone: '+7 (999) 000-00-01',
+    balances: testBalances,
+    history: [
+      { date: '2026-03-31', action: 'Обновление задолженности', author: 'Оператор' },
+      { date: '2026-03-18', action: 'Загружен протокол', author: 'Инспектор' },
+    ],
+  },
+  '7802345678': {
+    inn: '7802345678',
+    name: 'ООО Нева Трейд',
+    region: '78',
+    kno: 'МИФНС № 11',
+    address: 'г. Санкт-Петербург, Невский пр., д. 15',
+    director: 'Петров П.П.',
+    phone: '+7 (999) 000-00-02',
+    balances: [
+      { date: '2026-03-31', amount: 920, debtToRegion: 470 },
+      { date: '2026-03-15', amount: 980, debtToRegion: 495 },
+      { date: '2026-02-28', amount: 1040, debtToRegion: 520 },
+      { date: '2026-02-15', amount: 1090, debtToRegion: 548 },
+      { date: '2026-01-31', amount: 1160, debtToRegion: 575 },
+      { date: '2026-01-15', amount: 1190, debtToRegion: 590 },
+      { date: '2025-12-31', amount: 1240, debtToRegion: 615 },
+    ],
+    history: [
+      { date: '2026-03-20', action: 'Назначена повторная комиссия', author: 'Инспектор' },
+    ],
+  },
+  '5003456789': {
+    inn: '5003456789',
+    name: 'АО ТехИнвест',
+    region: '50',
+    kno: 'ИФНС № 5',
+    address: 'Московская область, г. Химки, ул. Заводская, д. 3',
+    director: 'Сидоров С.С.',
+    phone: '+7 (999) 000-00-03',
+    balances: [
+      { date: '2026-03-31', amount: 2410, debtToRegion: 1220 },
+      { date: '2026-03-15', amount: 2380, debtToRegion: 1200 },
+      { date: '2026-02-28', amount: 2320, debtToRegion: 1170 },
+      { date: '2026-02-15', amount: 2280, debtToRegion: 1145 },
+      { date: '2026-01-31', amount: 2210, debtToRegion: 1115 },
+      { date: '2026-01-15', amount: 2150, debtToRegion: 1080 },
+      { date: '2025-12-31', amount: 2080, debtToRegion: 1040 },
+    ],
+    history: [
+      { date: '2026-03-10', action: 'Завершено взаимодействие', author: 'Оператор' },
+    ],
+  },
+};
+
+export const commissionFormByInn: Record<string, CommissionForm> = {
+  '7701234567': {
+    commissionStatus: 'Комиссия проведена',
+    interactionStatus: 'Погасит частично',
+    commissionDate: '2026-03-18',
+    measures: true,
+    protocolFileName: 'protocol_7701234567.pdf',
+    comment: 'Плательщик подтвердил частичное погашение в течение 10 дней.',
+  },
+  '7802345678': {
+    commissionStatus: 'Неявка на комиссию',
+    interactionStatus: 'Требуется повторный вызов',
+    commissionDate: '2026-03-20',
+    measures: false,
+    protocolFileName: 'protocol_7802345678.pdf',
+    comment: 'Подготовить повторное приглашение.',
+  },
+  '5003456789': {
+    commissionStatus: 'Не требуется проведение комиссии',
+    interactionStatus: 'Погашен добровольно',
+    commissionDate: '2026-03-12',
+    measures: false,
+    protocolFileName: 'protocol_5003456789.pdf',
+    comment: 'Задолженность погашена до проведения комиссии.',
+  },
+};
