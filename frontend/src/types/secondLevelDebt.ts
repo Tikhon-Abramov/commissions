@@ -5,6 +5,12 @@ export type DebtSnapshot = {
     debtAmount: number;
 };
 
+export type DebtEmployeeItem = {
+    fio: string;
+    inn?: string;
+    debtAmount: number;
+};
+
 export type DebtMoItem = {
     oktmo: string;
     moName: string;
@@ -34,6 +40,7 @@ export type DebtTaxpayerItem = {
     address?: string;
     okved?: string;
     kno?: string;
+    employees?: DebtEmployeeItem[];
 };
 
 export type DebtSummaryMetric = {

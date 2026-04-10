@@ -1,0 +1,136 @@
+import { NavLink, Outlet } from 'react-router-dom';
+import styled from 'styled-components';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { toggleTheme } from '../../features/theme/themeSlice';
+
+const Shell = styled.div`
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const Sidebar = styled.aside`
+  border-right: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  padding: 20px 16px;
+`;
+
+const Brand = styled.div`
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 20px;
+`;
+
+const Nav = styled.nav`
+  display: grid;
+  gap: 8px;
+`;
+
+const NavItem = styled(NavLink)`
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: ${({ theme }) => theme.colors.text};
+  text-decoration: none;
+
+  &.active {
+    background: ${({ theme }) => theme.colors.primarySoft};
+    color: ${({ theme }) => theme.colors.primary};
+    font-weight: 700;
+  }
+`;
+
+const NavLabel = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const NavBadge = styled.span`
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const Main = styled.main`
+  padding: 20px;
+  background: ${({ theme }) => theme.colors.background};
+`;
+
+const TopBar = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+`;
+
+const ThemeButton = styled.button`
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
+  cursor: pointer;
+`;
+
+export function AppShell() {
+  const dispatch = useAppDispatch();
+  const { isAdmin, region } = useAppSelector((state) => state.auth);
+  const tickets = useAppSelector((state) => state.feedback.tickets);
+  const currentUserId = isAdmin ? 'admin-1' : `user-${region ?? '77'}`;
+
+  const unreadCount = tickets
+      .filter((ticket) => (isAdmin ? true : ticket.createdByUserId === currentUserId))
+      .reduce((acc, ticket) => acc + (isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser), 0);
+
+  const navItems = [
+    { label: 'Комиссии', to: '/commissions' },
+    { label: 'Долг 2-го уровня', to: '/mo' },
+    { label: 'Рейтинг МО', to: '/rating' },
+    { label: 'Документы', to: '/documents' },
+    { label: 'Обратная связь', to: '/feedback', badge: unreadCount },
+  ];
+
+  return (
+      <Shell>
+        <Sidebar>
+          <Brand>Commissions</Brand>
+
+          <Nav>
+            {navItems.map((item) => (
+                <NavItem key={item.to} to={item.to}>
+                  <NavLabel>{item.label}</NavLabel>
+                  {'badge' in item && item.badge ? <NavBadge>{item.badge}</NavBadge> : null}
+                </NavItem>
+            ))}
+          </Nav>
+        </Sidebar>
+
+        <Main>
+          <TopBar>
+            <ThemeButton type="button" onClick={() => dispatch(toggleTheme())}>
+              Сменить тему
+            </ThemeButton>
+          </TopBar>
+
+          <Outlet />
+        </Main>
+      </Shell>
+  );
+}

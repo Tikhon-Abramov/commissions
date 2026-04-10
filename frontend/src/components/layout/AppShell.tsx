@@ -84,6 +84,8 @@ export function AppShell() {
               <NavItem to="/commissions">Комиссии</NavItem>
               <NavItem to="/mo">Долг 2-го уровня</NavItem>
               <NavItem to="/rating">Рейтинг МО</NavItem>
+              <NavItem to="/documents">Документы</NavItem>
+              <NavItem to="/feedback">Обратная связь</NavItem>
             </Nav>
             <ThemeButton type="button" onClick={() => dispatch(toggleTheme())}>
               {mode === 'dark' ? 'Светлая тема' : 'Тёмная тема'}

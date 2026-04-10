@@ -93,50 +93,50 @@ const CompactTable = styled.table`
 `;
 
 const RegionTable = styled.table`
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 100%;
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 100%;
 `;
 
 const RegionTitleRow = styled.tr`
-    th {
-        background: ${({ theme }) => theme.colors.primary};
-        color: #fff;
-        font-size: 15px;
-        font-weight: 700;
-        text-align: center;
-        padding: 14px 10px;
-        border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-    }
+  th {
+    background: ${({ theme }) => theme.colors.primary};
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    padding: 14px 10px;
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  }
 `;
 
 const SectionRow = styled.tr`
-    td {
-        padding: 10px 12px;
-        font-size: 14px;
-        font-weight: 700;
-        color: ${({ theme }) => theme.colors.primary};
-        background: ${({ theme }) => theme.colors.surfaceAlt};
-        border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-    }
+  td {
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.surfaceAlt};
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  }
 `;
 
 const HeadCell = styled.th`
-    padding: 10px 8px;
-    font-size: 12px;
-    font-weight: 700;
-    text-align: center;
-    color: ${({ theme }) => theme.colors.text};
-    background: ${({ theme }) => theme.colors.surfaceAlt};
-    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  padding: 10px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.surfaceAlt};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 const Cell = styled.td<{ $align?: 'left' | 'center' | 'right' }>`
-    padding: 10px 8px;
-    font-size: 12px;
-    text-align: ${({ $align = 'left' }) => $align};
-    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-    vertical-align: middle;
+  padding: 10px 8px;
+  font-size: 12px;
+  text-align: ${({ $align = 'left' }) => $align};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  vertical-align: middle;
 `;
 
 const formatAmount = (value: number) => `${value.toLocaleString('ru-RU')} ₽`;
@@ -243,47 +243,140 @@ export function RatingPage() {
             </ViewSwitcher>
 
             {viewMode === 'region' ? (
+                <Section>
+                    <TableWrap>
+                        <RegionTable>
+                            <thead>
+                            <RegionTitleRow>
+                                <th colSpan={6}>Рейтинг по региону</th>
+                            </RegionTitleRow>
+                            <tr>
+                                <HeadCell style={{ width: '70px' }}>№</HeadCell>
+                                <HeadCell>Показатель</HeadCell>
+                                <HeadCell style={{ width: '140px' }}>Место в рейтинге</HeadCell>
+                                <HeadCell style={{ width: '160px' }}>Значение показателя</HeadCell>
+                                <HeadCell style={{ width: '180px' }}>Среднее значение по РФ</HeadCell>
+                                <HeadCell style={{ width: '160px' }}>Передовая практика</HeadCell>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+                            {regionRows.map((row: RatingRegionRow, index) => {
+                                if (row.type === 'section') {
+                                    return (
+                                        <SectionRow key={`section-${index}`}>
+                                            <td colSpan={6}>{row.title}</td>
+                                        </SectionRow>
+                                    );
+                                }
+
+                                return (
+                                    <tr key={row.code}>
+                                        <Cell $align="center">{row.code}</Cell>
+                                        <Cell>{row.name}</Cell>
+                                        <Cell $align="center">{row.place}</Cell>
+                                        <Cell $align="right">{row.value}</Cell>
+                                        <Cell $align="right">{row.averageRf}</Cell>
+                                        <Cell $align="right">{row.bestPractice}</Cell>
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </RegionTable>
+                    </TableWrap>
+                </Section>
+            ) : (
                 <>
                     <Section>
+                        <SectionTitle>Рейтинг по ОКТМО</SectionTitle>
                         <TableWrap>
-                            <RegionTable>
+                            <Table>
                                 <thead>
-                                <RegionTitleRow>
-                                    <th colSpan={6}>Рейтинг по региону</th>
-                                </RegionTitleRow>
                                 <tr>
-                                    <HeadCell style={{ width: '70px' }}>№</HeadCell>
-                                    <HeadCell>Показатель</HeadCell>
-                                    <HeadCell style={{ width: '140px' }}>Место в рейтинге</HeadCell>
-                                    <HeadCell style={{ width: '160px' }}>Значение показателя</HeadCell>
-                                    <HeadCell style={{ width: '180px' }}>Среднее значение по РФ</HeadCell>
-                                    <HeadCell style={{ width: '160px' }}>Передовая практика</HeadCell>
+                                    <HeadCell rowSpan={2}>№</HeadCell>
+                                    <HeadCell rowSpan={2}>ОКТМО</HeadCell>
+                                    <HeadCell rowSpan={2}>Наименование МО</HeadCell>
+
+                                    <HeadCell colSpan={2}>Соотношение долга к поступлениям (DTI)</HeadCell>
+                                    <HeadCell colSpan={2}>Доля должников БО</HeadCell>
+                                    <HeadCell colSpan={2}>Доля должников в общем количестве НП</HeadCell>
+                                    <HeadCell colSpan={2}>Доля НП, имеющих переплату</HeadCell>
+                                    <HeadCell colSpan={2}>
+                                        Доля НП БО, имеющих переплату, в общем количестве НП БО
+                                    </HeadCell>
+                                    <HeadCell colSpan={2}>Динамика долга за 12 месяцев</HeadCell>
+                                    <HeadCell colSpan={2}>Динамика долга БО за 12 месяцев</HeadCell>
+                                    <HeadCell colSpan={2}>
+                                        Доля должников к сотрудникам организаций с численностью &gt;100
+                                    </HeadCell>
+                                    <HeadCell colSpan={2}>
+                                        Доля должников к сотрудникам организаций БО с численностью &gt;100
+                                    </HeadCell>
+                                    <HeadCell colSpan={2}>Доля комиссий</HeadCell>
+
+                                    <HeadCell rowSpan={2}>Рейтинг МО</HeadCell>
+                                </tr>
+
+                                <tr>
+                                    {Array.from({ length: 10 }).map((_, index) => (
+                                        <Fragment key={index}>
+                                            <HeadCell>Значение</HeadCell>
+                                            <HeadCell>Место</HeadCell>
+                                        </Fragment>
+                                    ))}
                                 </tr>
                                 </thead>
 
                                 <tbody>
-                                {regionRows.map((row: RatingRegionRow, index) => {
-                                    if (row.type === 'section') {
-                                        return (
-                                            <SectionRow key={`section-${index}`}>
-                                                <td colSpan={6}>{row.title}</td>
-                                            </SectionRow>
-                                        );
-                                    }
+                                {!visibleMoRows.length ? (
+                                    <tr>
+                                        <Cell colSpan={24} $align="center">
+                                            Нет данных по выбранным параметрам
+                                        </Cell>
+                                    </tr>
+                                ) : (
+                                    visibleMoRows.map((row: RatingMoRow) => (
+                                        <tr key={row.id}>
+                                            <Cell $align="center">{row.id}</Cell>
+                                            <Cell>{row.oktmo}</Cell>
+                                            <Cell>{row.moName}</Cell>
 
-                                    return (
-                                        <tr key={row.code}>
-                                            <Cell $align="center">{row.code}</Cell>
-                                            <Cell>{row.name}</Cell>
-                                            <Cell $align="center">{row.place}</Cell>
-                                            <Cell $align="right">{row.value}</Cell>
-                                            <Cell $align="right">{row.averageRf}</Cell>
-                                            <Cell $align="right">{row.bestPractice}</Cell>
+                                            <Cell $align="center">{row.dti.value}</Cell>
+                                            <Cell $align="center">{row.dti.place}</Cell>
+
+                                            <Cell $align="center">{row.debtorsBudgetShare.value}</Cell>
+                                            <Cell $align="center">{row.debtorsBudgetShare.place}</Cell>
+
+                                            <Cell $align="center">{row.debtorsNpShare.value}</Cell>
+                                            <Cell $align="center">{row.debtorsNpShare.place}</Cell>
+
+                                            <Cell $align="center">{row.overpaymentNpShare.value}</Cell>
+                                            <Cell $align="center">{row.overpaymentNpShare.place}</Cell>
+
+                                            <Cell $align="center">{row.overpaymentBudgetNpShare.value}</Cell>
+                                            <Cell $align="center">{row.overpaymentBudgetNpShare.place}</Cell>
+
+                                            <Cell $align="center">{row.debt12mDynamics.value}</Cell>
+                                            <Cell $align="center">{row.debt12mDynamics.place}</Cell>
+
+                                            <Cell $align="center">{row.budgetDebt12mDynamics.value}</Cell>
+                                            <Cell $align="center">{row.budgetDebt12mDynamics.place}</Cell>
+
+                                            <Cell $align="center">{row.debtorsToEmployeesOver100.value}</Cell>
+                                            <Cell $align="center">{row.debtorsToEmployeesOver100.place}</Cell>
+
+                                            <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.value}</Cell>
+                                            <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.place}</Cell>
+
+                                            <Cell $align="center">{row.commissionsShare.value}</Cell>
+                                            <Cell $align="center">{row.commissionsShare.place}</Cell>
+
+                                            <Cell $align="center">{row.finalRating}</Cell>
                                         </tr>
-                                    );
-                                })}
+                                    ))
+                                )}
                                 </tbody>
-                            </RegionTable>
+                            </Table>
                         </TableWrap>
                     </Section>
 
@@ -423,99 +516,6 @@ export function RatingPage() {
                         </TableWrap>
                     </Section>
                 </>
-            ) : (
-                <Section>
-                    <SectionTitle>Рейтинг по ОКТМО</SectionTitle>
-                    <TableWrap>
-                        <Table>
-                            <thead>
-                            <tr>
-                                <HeadCell rowSpan={2}>№</HeadCell>
-                                <HeadCell rowSpan={2}>ОКТМО</HeadCell>
-                                <HeadCell rowSpan={2}>Наименование МО</HeadCell>
-
-                                <HeadCell colSpan={2}>Соотношение долга к поступлениям (DTI)</HeadCell>
-                                <HeadCell colSpan={2}>Доля должников БО</HeadCell>
-                                <HeadCell colSpan={2}>Доля должников в общем количестве НП</HeadCell>
-                                <HeadCell colSpan={2}>Доля НП, имеющих переплату</HeadCell>
-                                <HeadCell colSpan={2}>
-                                    Доля НП БО, имеющих переплату, в общем количестве НП БО
-                                </HeadCell>
-                                <HeadCell colSpan={2}>Динамика долга за 12 месяцев</HeadCell>
-                                <HeadCell colSpan={2}>Динамика долга БО за 12 месяцев</HeadCell>
-                                <HeadCell colSpan={2}>
-                                    Доля должников к сотрудникам организаций с численностью &gt;100
-                                </HeadCell>
-                                <HeadCell colSpan={2}>
-                                    Доля должников к сотрудникам организаций БО с численностью &gt;100
-                                </HeadCell>
-                                <HeadCell colSpan={2}>Доля комиссий</HeadCell>
-
-                                <HeadCell rowSpan={2}>Рейтинг МО</HeadCell>
-                            </tr>
-
-                            <tr>
-                                {Array.from({ length: 10 }).map((_, index) => (
-                                    <Fragment key={index}>
-                                        <HeadCell>Значение</HeadCell>
-                                        <HeadCell>Место</HeadCell>
-                                    </Fragment>
-                                ))}
-                            </tr>
-                            </thead>
-
-                            <tbody>
-                            {!visibleMoRows.length ? (
-                                <tr>
-                                    <Cell colSpan={24} $align="center">
-                                        Нет данных по выбранным параметрам
-                                    </Cell>
-                                </tr>
-                            ) : (
-                                visibleMoRows.map((row: RatingMoRow) => (
-                                    <tr key={row.id}>
-                                        <Cell $align="center">{row.id}</Cell>
-                                        <Cell>{row.oktmo}</Cell>
-                                        <Cell>{row.moName}</Cell>
-
-                                        <Cell $align="center">{row.dti.value}</Cell>
-                                        <Cell $align="center">{row.dti.place}</Cell>
-
-                                        <Cell $align="center">{row.debtorsBudgetShare.value}</Cell>
-                                        <Cell $align="center">{row.debtorsBudgetShare.place}</Cell>
-
-                                        <Cell $align="center">{row.debtorsNpShare.value}</Cell>
-                                        <Cell $align="center">{row.debtorsNpShare.place}</Cell>
-
-                                        <Cell $align="center">{row.overpaymentNpShare.value}</Cell>
-                                        <Cell $align="center">{row.overpaymentNpShare.place}</Cell>
-
-                                        <Cell $align="center">{row.overpaymentBudgetNpShare.value}</Cell>
-                                        <Cell $align="center">{row.overpaymentBudgetNpShare.place}</Cell>
-
-                                        <Cell $align="center">{row.debt12mDynamics.value}</Cell>
-                                        <Cell $align="center">{row.debt12mDynamics.place}</Cell>
-
-                                        <Cell $align="center">{row.budgetDebt12mDynamics.value}</Cell>
-                                        <Cell $align="center">{row.budgetDebt12mDynamics.place}</Cell>
-
-                                        <Cell $align="center">{row.debtorsToEmployeesOver100.value}</Cell>
-                                        <Cell $align="center">{row.debtorsToEmployeesOver100.place}</Cell>
-
-                                        <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.value}</Cell>
-                                        <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.place}</Cell>
-
-                                        <Cell $align="center">{row.commissionsShare.value}</Cell>
-                                        <Cell $align="center">{row.commissionsShare.place}</Cell>
-
-                                        <Cell $align="center">{row.finalRating}</Cell>
-                                    </tr>
-                                ))
-                            )}
-                            </tbody>
-                        </Table>
-                    </TableWrap>
-                </Section>
             )}
         </>
     );

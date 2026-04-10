@@ -1,28 +1,45 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { LoadingState, SummaryMetric } from '../../types/common';
-import type { RatingIndicator, RatingTopRow } from '../../types/rating';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { LoadingState } from '../../types/common';
+import type {
+  RatingMoRow,
+  RatingRegionRow,
+  RatingSummaryMetric,
+  RatingTopDebtorRow,
+  RatingTopDebtorSecondLevelRow,
+  RatingTopMoRow,
+} from '../../types/rating';
 
-interface RatingState {
+type RatingFilters = {
+  region: string;
+  period: string;
+};
+
+type RatingState = {
   loading: LoadingState;
-  summary: SummaryMetric[];
-  indicators: RatingIndicator[];
-  topBest: RatingTopRow[];
-  topWorst: RatingTopRow[];
-  filters: {
-    region: string;
-    period: string;
-  };
-}
+  summary: RatingSummaryMetric[];
+  regionRows: RatingRegionRow[];
+  moRows: RatingMoRow[];
+  topBestMoRows: RatingTopMoRow[];
+  topWorstMoRows: RatingTopMoRow[];
+  topDebtorsRows: RatingTopDebtorRow[];
+  topBudgetDebtorsRows: RatingTopDebtorRow[];
+  topSecondLevelDebtorsRows: RatingTopDebtorSecondLevelRow[];
+  filters: RatingFilters;
+};
 
 const initialState: RatingState = {
   loading: 'idle',
   summary: [],
-  indicators: [],
-  topBest: [],
-  topWorst: [],
+  regionRows: [],
+  moRows: [],
+  topBestMoRows: [],
+  topWorstMoRows: [],
+  topDebtorsRows: [],
+  topBudgetDebtorsRows: [],
+  topSecondLevelDebtorsRows: [],
   filters: {
     region: '',
-    period: '',
+    period: '2026-Q1',
   },
 };
 
@@ -33,21 +50,50 @@ const ratingSlice = createSlice({
     setRatingLoading(state, action: PayloadAction<LoadingState>) {
       state.loading = action.payload;
     },
-    setRatingSummary(state, action: PayloadAction<SummaryMetric[]>) {
+    setRatingSummary(state, action: PayloadAction<RatingSummaryMetric[]>) {
       state.summary = action.payload;
     },
-    setRatingIndicators(state, action: PayloadAction<RatingIndicator[]>) {
-      state.indicators = action.payload;
+    setRatingRegionRows(state, action: PayloadAction<RatingRegionRow[]>) {
+      state.regionRows = action.payload;
     },
-    setRatingTops(state, action: PayloadAction<{ topBest: RatingTopRow[]; topWorst: RatingTopRow[] }>) {
-      state.topBest = action.payload.topBest;
-      state.topWorst = action.payload.topWorst;
+    setRatingMoRows(state, action: PayloadAction<RatingMoRow[]>) {
+      state.moRows = action.payload;
     },
-    setRatingFilters(state, action: PayloadAction<Partial<RatingState['filters']>>) {
-      state.filters = { ...state.filters, ...action.payload };
+    setRatingTopBestMoRows(state, action: PayloadAction<RatingTopMoRow[]>) {
+      state.topBestMoRows = action.payload;
+    },
+    setRatingTopWorstMoRows(state, action: PayloadAction<RatingTopMoRow[]>) {
+      state.topWorstMoRows = action.payload;
+    },
+    setTopDebtorsRows(state, action: PayloadAction<RatingTopDebtorRow[]>) {
+      state.topDebtorsRows = action.payload;
+    },
+    setTopBudgetDebtorsRows(state, action: PayloadAction<RatingTopDebtorRow[]>) {
+      state.topBudgetDebtorsRows = action.payload;
+    },
+    setTopSecondLevelDebtorsRows(state, action: PayloadAction<RatingTopDebtorSecondLevelRow[]>) {
+      state.topSecondLevelDebtorsRows = action.payload;
+    },
+    setRatingFilters(state, action: PayloadAction<Partial<RatingFilters>>) {
+      state.filters = {
+        ...state.filters,
+        ...action.payload,
+      };
     },
   },
 });
 
-export const { setRatingLoading, setRatingSummary, setRatingIndicators, setRatingTops, setRatingFilters } = ratingSlice.actions;
+export const {
+  setRatingLoading,
+  setRatingSummary,
+  setRatingRegionRows,
+  setRatingMoRows,
+  setRatingTopBestMoRows,
+  setRatingTopWorstMoRows,
+  setTopDebtorsRows,
+  setTopBudgetDebtorsRows,
+  setTopSecondLevelDebtorsRows,
+  setRatingFilters,
+} = ratingSlice.actions;
+
 export default ratingSlice.reducer;

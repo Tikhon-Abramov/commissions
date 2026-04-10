@@ -15,7 +15,7 @@ export function AppRouter() {
                 <Route path="mo" element={< SecondLevelDebtPage/>} />
                 <Route path="rating" element={<RatingPage />} />
                 <Route path="documents" element={<DocumentsPage />} />
-                <Route path="feedback" element={<FeedbackPage />} />
+                
                 <Route path="*" element={<Navigate to="/commissions" replace />} />
             </Route>
         </Routes>

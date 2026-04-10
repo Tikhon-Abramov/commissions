@@ -230,57 +230,57 @@ const LinkButton = styled.button`
 `;
 
 const ExpandButton = styled.button`
-    border: none;
-    background: transparent;
-    padding: 0;
-    color: ${({ theme }) => theme.colors.primary};
-    font-weight: 700;
-    font-size: 18px;
-    cursor: pointer;
-    width: 24px;
-    height: 24px;
-    line-height: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: ${({ theme }) => theme.colors.primary};
+  font-weight: 700;
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
 `;
 
 const BudgetName = styled.span<{ $budget?: boolean }>`
-    color: ${({ $budget, theme }) => ($budget ? '#2563eb' : theme.colors.text)};
-    font-weight: ${({ $budget }) => ($budget ? 700 : 400)};
+  color: ${({ $budget, theme }) => ($budget ? '#2563eb' : theme.colors.text)};
+  font-weight: ${({ $budget }) => ($budget ? 700 : 400)};
 `;
 
 const TaxpayerTypeBadge = styled.span<{ $budget?: boolean }>`
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 11px;
-    background: ${({ $budget, theme }) =>
-            $budget ? 'rgba(59, 130, 246, 0.12)' : theme.colors.primarySoft};
-    color: ${({ $budget, theme }) => ($budget ? '#2563eb' : theme.colors.primary)};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: ${({ $budget, theme }) =>
+    $budget ? 'rgba(59, 130, 246, 0.12)' : theme.colors.primarySoft};
+  color: ${({ $budget, theme }) => ($budget ? '#2563eb' : theme.colors.primary)};
 `;
 
 const FsspBadge = styled.span<{ $active?: boolean }>`
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 11px;
-    background: ${({ $active, theme }) =>
-            $active ? 'rgba(239, 68, 68, 0.12)' : theme.colors.surfaceAlt};
-    color: ${({ $active, theme }) => ($active ? theme.colors.danger : theme.colors.muted)};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: ${({ $active, theme }) =>
+    $active ? 'rgba(239, 68, 68, 0.12)' : theme.colors.surfaceAlt};
+  color: ${({ $active, theme }) => ($active ? theme.colors.danger : theme.colors.muted)};
 `;
 
 const EmployeeButton = styled.button`
-    height: 30px;
-    padding: 0 10px;
-    border-radius: 8px;
-    border: 1px solid ${({ theme }) => theme.colors.border};
-    background: ${({ theme }) => theme.colors.surface};
-    color: ${({ theme }) => theme.colors.primary};
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
 `;
 
 const formatAmount = (value: number) => `${value.toLocaleString('ru-RU')} ₽`;
@@ -298,18 +298,6 @@ const formatDateLabel = (value: string) => {
 const getLatestAvailableDate = (items: Array<{ date: string }>) => {
     const dates = Array.from(new Set(items.map((item) => item.date))).sort((a, b) => b.localeCompare(a));
     return dates[0] ?? '';
-};
-
-const matchesTaxpayerSearch = (item: DebtTaxpayerItem, search: string) => {
-    const normalized = search.trim().toLowerCase();
-    if (!normalized) return true;
-
-    return (
-        item.inn.includes(normalized) ||
-        item.name.toLowerCase().includes(normalized) ||
-        item.oktmo.toLowerCase().includes(normalized) ||
-        item.moName.toLowerCase().includes(normalized)
-    );
 };
 
 export function SecondLevelDebtPage() {
@@ -367,29 +355,7 @@ export function SecondLevelDebtPage() {
         ];
     }, [summarySource]);
 
-    const filteredTaxpayersByOktmo = useMemo(() => {
-        const map = new Map<string, DebtTaxpayerItem[]>();
-
-        regionScopedTaxpayers
-            .filter((item) => item.date === filters.date)
-            .filter((item) => {
-                if (filters.budgetType === 'budget') return item.isBudgetOrganization;
-                if (filters.budgetType === 'non-budget') return !item.isBudgetOrganization;
-                return true;
-            })
-            .filter((item) => matchesTaxpayerSearch(item, filters.search))
-            .forEach((item) => {
-                const existing = map.get(item.oktmo) ?? [];
-                existing.push(item);
-                map.set(item.oktmo, existing);
-            });
-
-        return map;
-    }, [filters.budgetType, filters.date, filters.search, regionScopedTaxpayers]);
-
     const moTableData = useMemo(() => {
-        const normalizedSearch = filters.search.trim().toLowerCase();
-
         let result = regionScopedMo.filter((item) => item.date === filters.date);
 
         if (filters.budgetType === 'budget') {
@@ -400,20 +366,31 @@ export function SecondLevelDebtPage() {
             result = result.filter((item) => item.budgetType === 'non-budget');
         }
 
-        if (!normalizedSearch) {
-            return result;
+        if (filters.search.trim()) {
+            const search = filters.search.trim().toLowerCase();
+            result = result.filter(
+                (item) =>
+                    item.oktmo.toLowerCase().includes(search) ||
+                    item.moName.toLowerCase().includes(search),
+            );
         }
 
-        return result.filter((item) => {
-            const moMatches =
-                item.oktmo.toLowerCase().includes(normalizedSearch) ||
-                item.moName.toLowerCase().includes(normalizedSearch);
+        return result;
+    }, [filters.budgetType, filters.date, filters.search, regionScopedMo]);
 
-            const taxpayerMatches = (filteredTaxpayersByOktmo.get(item.oktmo) ?? []).length > 0;
+    const taxpayersByOktmo = useMemo(() => {
+        const map = new Map<string, DebtTaxpayerItem[]>();
 
-            return moMatches || taxpayerMatches;
-        });
-    }, [filters.budgetType, filters.date, filters.search, filteredTaxpayersByOktmo, regionScopedMo]);
+        regionScopedTaxpayers
+            .filter((item) => item.date === filters.date)
+            .forEach((item) => {
+                const existing = map.get(item.oktmo) ?? [];
+                existing.push(item);
+                map.set(item.oktmo, existing);
+            });
+
+        return map;
+    }, [filters.date, regionScopedTaxpayers]);
 
     const availableDates = useMemo(() => {
         return Array.from(new Set(regionScopedMo.map((item) => item.date)))
@@ -460,7 +437,7 @@ export function SecondLevelDebtPage() {
             key: 'search',
             label: 'Поиск информации',
             value: filters.search,
-            placeholder: 'ОКТМО, МО, ИНН, Наименование',
+            placeholder: 'ОКТМО, МО',
             onChange: (value: string) => {
                 dispatch(setSecondLevelDebtFilters({ search: value }));
                 setExpandedOktmo(null);
@@ -512,7 +489,7 @@ export function SecondLevelDebtPage() {
 
             <Toolbar>
                 <Note>
-                    По умолчанию загружается крайняя доступная дата. Поиск работает по ОКТМО, МО, ИНН и наименованию НП.
+                    По умолчанию загружается крайняя доступная дата. Налогоплательщики раскрываются внутри строки МО.
                 </Note>
 
                 <ToolbarActions>
@@ -570,7 +547,12 @@ export function SecondLevelDebtPage() {
                         </tr>
                     ) : (
                         moTableData.map((row) => {
-                            const nestedRows = filteredTaxpayersByOktmo.get(row.oktmo) ?? [];
+                            const nestedRows = (taxpayersByOktmo.get(row.oktmo) ?? []).filter((item) => {
+                                if (filters.budgetType === 'budget') return item.isBudgetOrganization;
+                                if (filters.budgetType === 'non-budget') return !item.isBudgetOrganization;
+                                return true;
+                            });
+
                             const isExpanded = expandedOktmo === row.oktmo;
 
                             return (
