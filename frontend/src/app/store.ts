@@ -1,17 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from '../features/auth/authSlice';
 import commissionsReducer from '../features/commissions/commissionsSlice';
-import moReducer from '../features/mo/moSlice';
-import ratingReducer from '../features/rating/ratingSlice';
-import themeReducer from '../features/theme/themeSlice';
+import secondLevelDebtReducer from '../features/secondLevelDebt/secondLevelDebtSlice';
+import authReducer from '../features/auth/authSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     commissions: commissionsReducer,
-    mo: moReducer,
-    rating: ratingReducer,
-    theme: themeReducer,
+    secondLevelDebt: secondLevelDebtReducer,
   },
 });
 

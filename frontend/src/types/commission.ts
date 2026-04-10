@@ -10,6 +10,31 @@ export type CommissionHistoryItem = {
   author: string;
 };
 
+export type CompanyRevenueByYear = {
+  year: string;
+  value: number | null;
+};
+
+export type CompanyHeadcountByYear = {
+  year: string;
+  value: number | null;
+};
+
+export type PreviousPeriodItem = {
+  date: string;
+  ensBalance: number;
+  regionalDebt: number;
+};
+
+export type EnforcementMeasures = {
+  requirementExists?: boolean;
+  decision46Exists?: boolean;
+  постановления47Count?: number;
+  debt47Amount?: number;
+  zvsp48Count?: number;
+  zvspDebtAmount?: number;
+};
+
 export type CommissionItem = {
   inn: string;
   name: string;
@@ -19,8 +44,6 @@ export type CommissionItem = {
   commissionStatus?: string;
   interactionStatus?: string;
   protocolFileName?: string;
-
-  // Для верхних динамических блоков
   employeeDebtorsCount?: number;
   employeeDebtAmount?: number;
 };
@@ -30,10 +53,20 @@ export type CommissionCard = {
   name: string;
   region: string;
   kno: string;
-  address: string;
-  director: string;
-  phone: string;
+  oktmo?: string;
+  employeeDebtorsCount?: number;
+  realEstateObjectsCount?: number;
+  landPlotsCount?: number;
+  transportCount?: number;
+  address?: string;
+  okved?: string;
+  revenueByYear?: CompanyRevenueByYear[];
+  headcountByYear?: CompanyHeadcountByYear[];
   balances: CommissionBalance[];
+  previousPeriods?: PreviousPeriodItem[];
+  enforcement?: EnforcementMeasures;
+  director?: string;
+  phone?: string;
   history: CommissionHistoryItem[];
 };
 
@@ -44,6 +77,8 @@ export type CommissionForm = {
   measures: boolean;
   protocolFileName?: string;
   comment: string;
+  influenceMeasures?: string;
+  authorityParticipation?: string;
 };
 
 export type CommissionSummaryItem = {

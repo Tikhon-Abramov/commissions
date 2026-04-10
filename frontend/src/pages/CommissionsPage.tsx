@@ -20,10 +20,12 @@ import {
     updateCommissionForm,
 } from '../features/commissions/commissionsSlice';
 import type { CommissionBalance, CommissionItem, CommissionSummaryItem } from '../types/commission';
+import { exportCommissionsStatsXlsx } from '../utils/exportCommissionsStatsXlsx';
 
 const Toolbar = styled.div`
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     margin-bottom: 14px;
     flex-wrap: wrap;
@@ -32,6 +34,34 @@ const Toolbar = styled.div`
 const Note = styled.div`
     color: ${({ theme }) => theme.colors.muted};
     font-size: 13px;
+`;
+
+const ToolbarActions = styled.div`
+    display: flex;
+    gap: 10px;
+    align-items: center;
+`;
+
+const DownloadButton = styled.button`
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.surface};
+    color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+        border-color: ${({ theme }) => theme.colors.primary};
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
 `;
 
 const LinkButton = styled.button`
@@ -98,32 +128,31 @@ const ResultText = styled.div`
 `;
 
 const ProtocolIcon = styled.span<{ $attached: boolean }>`
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    font-size: 14px;
-    background: ${({ $attached, theme }) =>
-            $attached ? theme.colors.primarySoft : theme.colors.surfaceAlt};
-    color: ${({ $attached, theme }) =>
-            $attached ? theme.colors.primary : theme.colors.muted};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 14px;
+  background: ${({ $attached, theme }) =>
+    $attached ? theme.colors.primarySoft : theme.colors.surfaceAlt};
+  color: ${({ $attached, theme }) =>
+    $attached ? theme.colors.primary : theme.colors.muted};
 `;
 
 const DeltaText = styled.div<{ $positive: boolean; $negative: boolean }>`
-    font-size: 10px;
-    line-height: 1.15;
-    white-space: nowrap;
-    color: ${({ theme, $positive, $negative }) => {
-        if ($positive) return theme.colors.danger;
-        if ($negative) return theme.colors.primary;
-        return theme.colors.muted;
-    }};
+  font-size: 10px;
+  line-height: 1.15;
+  white-space: nowrap;
+  color: ${({ theme, $positive, $negative }) => {
+    if ($positive) return theme.colors.danger;
+    if ($negative) return theme.colors.primary;
+    return theme.colors.muted;
+}};
 `;
 
 const formatAmount = (value: number) => value.toLocaleString('ru-RU');
-
 const formatSummaryCurrency = (value: number) => `${value.toLocaleString('ru-RU')} ₽`;
 
 const formatColumnDate = (value: string) => {
@@ -210,6 +239,14 @@ const formatDelta = (value: number) => {
     return `0,0%`;
 };
 
+const getCurrentQuarter = () => {
+    const now = new Date();
+    const quarter = Math.floor(now.getMonth() / 3) + 1;
+    return `${now.getFullYear()}-Q${quarter}`;
+};
+
+
+
 export function CommissionsPage() {
     const dispatch = useAppDispatch();
     const { list, filters, selectedCard, isCardOpen, currentForm } = useAppSelector((state) => state.commissions);
@@ -219,14 +256,27 @@ export function CommissionsPage() {
         dispatch(setCommissionsList(commissionsList));
     }, [dispatch]);
 
+    const handleDownloadStatistics = () => {
+        exportCommissionsStatsXlsx({
+            items: list,
+            quarter: filters.quarter,
+            regionCode: filters.region,
+            isAdmin,
+            userRegion,
+        });
+    };
+
+    const regionSummaryList = useMemo(() => {
+        const activeRegion = isAdmin ? filters.region : userRegion ?? '';
+        return list.filter((item) => !activeRegion || item.region === activeRegion);
+    }, [filters.region, isAdmin, list, userRegion]);
+
     const regionScopedList = useMemo(() => {
         const activeRegion = isAdmin ? filters.region : userRegion ?? '';
-
         return list.filter((item) => {
             const regionMatches = !activeRegion || item.region === activeRegion;
             const quarterMatches =
-                !filters.quarter || item.balances.some((balance) => getQuarterCode(balance.date) === filters.quarter);
-
+                item.balances.some((balance) => getQuarterCode(balance.date) === filters.quarter);
             return regionMatches && quarterMatches;
         });
     }, [filters.quarter, filters.region, isAdmin, list, userRegion]);
@@ -246,23 +296,13 @@ export function CommissionsPage() {
     }, [filters.search, filters.status, regionScopedList]);
 
     const summary = useMemo<CommissionSummaryItem[]>(() => {
-        const npCount = filteredList.length;
-
-        const ensBalance = filteredList.reduce((acc, item) => {
-            return acc + getLatestBalanceAmount(item.balances);
-        }, 0);
-
-        const completedCommissions = filteredList.filter(
+        const npCount = regionSummaryList.length;
+        const ensBalance = regionSummaryList.reduce((acc, item) => acc + getLatestBalanceAmount(item.balances), 0);
+        const completedCommissions = regionSummaryList.filter(
             (item) => item.commissionStatus === 'Комиссия проведена',
         ).length;
-
-        const employeeDebtors = filteredList.reduce((acc, item) => {
-            return acc + (item.employeeDebtorsCount ?? 0);
-        }, 0);
-
-        const employeeDebt = filteredList.reduce((acc, item) => {
-            return acc + (item.employeeDebtAmount ?? 0);
-        }, 0);
+        const employeeDebtors = regionSummaryList.reduce((acc, item) => acc + (item.employeeDebtorsCount ?? 0), 0);
+        const employeeDebt = regionSummaryList.reduce((acc, item) => acc + (item.employeeDebtAmount ?? 0), 0);
 
         return [
             { label: 'Количество НП', value: formatAmount(npCount) },
@@ -271,28 +311,33 @@ export function CommissionsPage() {
             { label: 'Сотрудников-должников', value: formatAmount(employeeDebtors) },
             { label: 'Задолженность сотрудников', value: formatSummaryCurrency(employeeDebt) },
         ];
-    }, [filteredList]);
+    }, [regionSummaryList]);
 
     const balanceDates = useMemo(() => {
         const uniqueDates = new Set<string>();
 
         regionScopedList.forEach((item) => {
             item.balances.forEach((balance) => {
-                uniqueDates.add(balance.date);
+                if (getQuarterCode(balance.date) === filters.quarter) {
+                    uniqueDates.add(balance.date);
+                }
             });
         });
 
         return Array.from(uniqueDates).sort((a, b) => b.localeCompare(a)).slice(0, 7);
-    }, [regionScopedList]);
+    }, [filters.quarter, regionScopedList]);
 
     const openCard = (row: CommissionItem) => {
         const card = commissionCardsByInn[row.inn];
         const form = commissionFormByInn[row.inn];
-
         if (card && form) {
             dispatch(openCommissionCard({ card, form }));
         }
     };
+
+
+
+    const currentQuarter = getCurrentQuarter();
 
     const filterFields: FilterField[] = [
         ...(isAdmin
@@ -318,10 +363,10 @@ export function CommissionsPage() {
             type: 'select' as const,
             value: filters.quarter,
             options: [
-                { value: '', label: 'Все кварталы' },
-                { value: '2026-Q1', label: '1 кв. 2026' },
-                { value: '2025-Q4', label: '4 кв. 2025' },
-            ],
+                { value: currentQuarter, label: currentQuarter.replace('-', ' ') },
+                { value: '2026-Q1', label: '2026 Q1' },
+                { value: '2025-Q4', label: '2025 Q4' },
+            ].filter((option, index, array) => array.findIndex((x) => x.value === option.value) === index),
             onChange: (value: string) => dispatch(setCommissionFilters({ quarter: value })),
         },
         {
@@ -350,15 +395,21 @@ export function CommissionsPage() {
         <>
             <PageHeader
                 title="Комиссии"
-                description="Основной список плательщиков, динамика задолженности по датам, карточка ИНН и сохранение результата комиссии."
+                description="Первичная загрузка выполняется за текущий квартал. Карточка ИНН содержит расширенные данные по плательщику и комиссии."
             />
 
             <SummaryGrid metrics={summary} />
 
             <Toolbar>
                 <Note>
-                    Верхние показатели пересчитываются динамически по текущему отфильтрованному списку.
+                    По умолчанию загружается текущий квартал, чтобы не перегружать страницу. Верхние показатели считаются только по выбранному региону.
                 </Note>
+
+                <ToolbarActions>
+                    <DownloadButton type="button" onClick={handleDownloadStatistics}>
+                        Скачать статистику
+                    </DownloadButton>
+                </ToolbarActions>
             </Toolbar>
 
             <FilterBar fields={filterFields} />
@@ -393,9 +444,7 @@ export function CommissionsPage() {
                             const balance = getBalanceByDate(row.balances, date);
                             const delta = getDeltaPercent(row.balances, date, balanceDates);
 
-                            if (!balance) {
-                                return <EmptyPeriod>—</EmptyPeriod>;
-                            }
+                            if (!balance) return <EmptyPeriod>—</EmptyPeriod>;
 
                             return (
                                 <PeriodCell>

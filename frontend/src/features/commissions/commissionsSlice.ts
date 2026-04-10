@@ -1,60 +1,62 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { LoadingState, SummaryMetric } from '../../types/common';
-import type { CommissionCompanyCard, CommissionEditForm, CommissionItem } from '../../types/commission';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { CommissionCard, CommissionForm, CommissionItem, CommissionSummaryItem } from '../../types/commission';
 
-interface CommissionsState {
-  loading: LoadingState;
-  list: CommissionItem[];
-  summary: SummaryMetric[];
-  selectedCard: CommissionCompanyCard | null;
-  isCardOpen: boolean;
-  currentForm: CommissionEditForm;
-  filters: {
-    region: string;
-    quarter: string;
-    search: string;
-    status: string;
-  };
-}
-
-const emptyForm: CommissionEditForm = {
-  commissionStatus: '',
-  interactionStatus: '',
-  commissionDate: '',
-  measures: false,
-  note: '',
-  protocolFileName: '',
+const getCurrentQuarter = () => {
+  const now = new Date();
+  const quarter = Math.floor(now.getMonth() / 3) + 1;
+  return `${now.getFullYear()}-Q${quarter}`;
 };
 
-const initialState: CommissionsState = {
-  loading: 'idle',
+type CommissionFilters = {
+  region: string;
+  quarter: string;
+  status: string;
+  search: string;
+};
+
+type CommissionState = {
+  list: CommissionItem[];
+  summary: CommissionSummaryItem[];
+  filters: CommissionFilters;
+  selectedCard: CommissionCard | null;
+  currentForm: CommissionForm | null;
+  isCardOpen: boolean;
+};
+
+const initialState: CommissionState = {
   list: [],
   summary: [],
-  selectedCard: null,
-  isCardOpen: false,
-  currentForm: emptyForm,
   filters: {
     region: '',
-    quarter: '',
-    search: '',
+    quarter: getCurrentQuarter(),
     status: '',
+    search: '',
   },
+  selectedCard: null,
+  currentForm: null,
+  isCardOpen: false,
 };
 
 const commissionsSlice = createSlice({
   name: 'commissions',
   initialState,
   reducers: {
-    setCommissionsLoading(state, action: PayloadAction<LoadingState>) {
-      state.loading = action.payload;
-    },
     setCommissionsList(state, action: PayloadAction<CommissionItem[]>) {
       state.list = action.payload;
     },
-    setCommissionsSummary(state, action: PayloadAction<SummaryMetric[]>) {
+    setCommissionsSummary(state, action: PayloadAction<CommissionSummaryItem[]>) {
       state.summary = action.payload;
     },
-    openCommissionCard(state, action: PayloadAction<{ card: CommissionCompanyCard; form: CommissionEditForm }>) {
+    setCommissionFilters(state, action: PayloadAction<Partial<CommissionFilters>>) {
+      state.filters = {
+        ...state.filters,
+        ...action.payload,
+      };
+    },
+    openCommissionCard(
+        state,
+        action: PayloadAction<{ card: CommissionCard; form: CommissionForm }>,
+    ) {
       state.selectedCard = action.payload.card;
       state.currentForm = action.payload.form;
       state.isCardOpen = true;
@@ -62,39 +64,50 @@ const commissionsSlice = createSlice({
     closeCommissionCard(state) {
       state.isCardOpen = false;
       state.selectedCard = null;
+      state.currentForm = null;
     },
-    setCommissionFilters(state, action: PayloadAction<Partial<CommissionsState['filters']>>) {
-      state.filters = { ...state.filters, ...action.payload };
-    },
-    updateCommissionForm(state, action: PayloadAction<Partial<CommissionEditForm>>) {
-      state.currentForm = { ...state.currentForm, ...action.payload };
+    updateCommissionForm(state, action: PayloadAction<Partial<CommissionForm>>) {
+      if (!state.currentForm) return;
+      state.currentForm = {
+        ...state.currentForm,
+        ...action.payload,
+      };
     },
     applyCommissionForm(state) {
-      if (!state.selectedCard) {
-        return;
-      }
+      if (!state.selectedCard || !state.currentForm) return;
 
-      const target = state.list.find((item) => item.inn === state.selectedCard?.inn);
-      if (!target) {
-        return;
-      }
+      state.list = state.list.map((item) =>
+          item.inn === state.selectedCard?.inn
+              ? {
+                ...item,
+                commissionStatus: state.currentForm?.commissionStatus,
+                interactionStatus: state.currentForm?.interactionStatus,
+                protocolFileName: state.currentForm?.protocolFileName,
+              }
+              : item,
+      );
 
-      target.commissionStatus = state.currentForm.commissionStatus;
-      target.interactionStatus = state.currentForm.interactionStatus;
-      target.commissionDate = state.currentForm.commissionDate;
-      target.measures = state.currentForm.measures;
-      target.protocolFileName = state.currentForm.protocolFileName;
+      state.selectedCard = {
+        ...state.selectedCard,
+        history: [
+          {
+            date: new Date().toISOString().slice(0, 10),
+            action: 'Изменения по комиссии сохранены',
+            author: 'Текущий пользователь',
+          },
+          ...state.selectedCard.history,
+        ],
+      };
     },
   },
 });
 
 export const {
-  setCommissionsLoading,
   setCommissionsList,
   setCommissionsSummary,
+  setCommissionFilters,
   openCommissionCard,
   closeCommissionCard,
-  setCommissionFilters,
   updateCommissionForm,
   applyCommissionForm,
 } = commissionsSlice.actions;

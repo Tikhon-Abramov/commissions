@@ -1,54 +1,52 @@
-export interface CommissionBalance {
+export type CommissionBalance = {
   date: string;
   amount: number;
   debtToRegion?: number;
-}
+};
 
-export interface CommissionItem {
+export type CommissionHistoryItem = {
+  date: string;
+  action: string;
+  author: string;
+};
+
+export type CommissionItem = {
   inn: string;
   name: string;
-  kno: string;
   region: string;
-  regionName: string;
+  kno: string;
   balances: CommissionBalance[];
   commissionStatus?: string;
   interactionStatus?: string;
-  commissionDate?: string;
-  measures?: boolean;
   protocolFileName?: string;
-}
 
-export interface CommissionCompanyCard {
+  // Для верхних динамических блоков
+  employeeDebtorsCount?: number;
+  employeeDebtAmount?: number;
+};
+
+export type CommissionCard = {
   inn: string;
   name: string;
+  region: string;
   kno: string;
-  oktmo?: string;
-  address?: string;
-  okved?: string;
-  employeesCount?: number;
-  workersWithDebt?: number;
-  workersDebt?: number;
-  propertiesCount?: number;
-  landCount?: number;
-  transportCount?: number;
-  revenue?: Record<string, number | null>;
-  averageHeadcount?: Record<string, number | null>;
-  balances?: CommissionBalance[];
-  history?: CommissionHistoryItem[];
-}
+  address: string;
+  director: string;
+  phone: string;
+  balances: CommissionBalance[];
+  history: CommissionHistoryItem[];
+};
 
-export interface CommissionHistoryItem {
-  id: string;
-  date: string;
-  username: string;
-  action: string;
-}
-
-export interface CommissionEditForm {
+export type CommissionForm = {
   commissionStatus: string;
   interactionStatus: string;
   commissionDate: string;
   measures: boolean;
-  note: string;
-  protocolFileName: string;
-}
+  protocolFileName?: string;
+  comment: string;
+};
+
+export type CommissionSummaryItem = {
+  label: string;
+  value: string;
+};
