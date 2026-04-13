@@ -10,6 +10,7 @@ import { CommissionsPage } from '../pages/CommissionsPage';
 import { DocumentsPage } from '../pages/DocumentsPage';
 import { FeedbackPage } from '../pages/FeedbackPage';
 import { RatingPage } from '../pages/RatingPage';
+import { RegionStatsPage } from '../pages/RegionStatsPage';
 import { SecondLevelDebtPage } from '../pages/SecondLevelDebtPage';
 
 export function AppRouter() {
@@ -20,7 +21,6 @@ export function AppRouter() {
             <Route element={<AuthGuard />}>
                 <Route path="/" element={<AppShell />}>
                     <Route index element={<Navigate to="/commissions" replace />} />
-
                     <Route path="commissions" element={<CommissionsPage />} />
                     <Route path="mo" element={<SecondLevelDebtPage />} />
                     <Route path="rating" element={<RatingPage />} />
@@ -29,6 +29,7 @@ export function AppRouter() {
 
                     <Route element={<AdminOnlyRoute />}>
                         <Route path="admin" element={<AdminPage />} />
+                        <Route path="region-stats" element={<RegionStatsPage />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/commissions" replace />} />
