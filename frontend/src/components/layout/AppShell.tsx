@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { logout } from '../../features/auth/authSlice';
 import { toggleTheme } from '../../features/theme/themeSlice';
+import { apiRequest } from '../../lib/api';
 
 const DRAWER_WIDTH = 260;
 
@@ -232,7 +233,15 @@ export function AppShell() {
   const closeDrawer = () => setIsDrawerOpen(false);
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiRequest('/auth/logout', {
+        method: 'POST',
+      });
+    } catch {
+      // ignore
+    }
+
     dispatch(logout());
     setIsDrawerOpen(false);
     navigate('/login', { replace: true });
@@ -251,11 +260,7 @@ export function AppShell() {
 
           <Nav>
             {navItems.map((item) => (
-                <NavItem
-                    key={item.to}
-                    to={item.to}
-                    onClick={closeDrawer}
-                >
+                <NavItem key={item.to} to={item.to} onClick={closeDrawer}>
                   <NavLabel>{item.label}</NavLabel>
                   {'badge' in item && item.badge ? <NavBadge>{item.badge}</NavBadge> : null}
                 </NavItem>

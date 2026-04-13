@@ -1,30 +1,37 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { PageHeader } from '../components/common/PageHeader';
-import {
-    closeUserModal,
-    openCreateUserModal,
-    openEditUserModal,
-    saveUserDraft,
-    setServiceModeMessage,
-    toggleServiceMode,
-    toggleUserActive,
-    updateUserDraft,
-} from '../features/admin/adminSlice';
+import { apiRequest } from '../lib/api';
+
+type AdminUser = {
+    id: string | number;
+    login: string;
+    password: string;
+    lastName: string;
+    firstName: string;
+    middleName: string;
+    role: 'admin' | 'user';
+    region: string;
+    isActive: boolean;
+};
+
+type ServiceModeState = {
+    enabled: boolean;
+    message: string;
+};
 
 const PageWrap = styled.div`
-    display: grid;
-    gap: 18px;
+  display: grid;
+  gap: 18px;
 `;
 
 const TopCard = styled.section`
-    border: 1px solid ${({ theme }) => theme.colors.border};
-    background: ${({ theme }) => theme.colors.surface};
-    border-radius: 18px;
-    padding: 18px;
-    display: grid;
-    gap: 14px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
 `;
 
 const TopRow = styled.div`
@@ -222,6 +229,11 @@ const ModalFooter = styled.div`
     gap: 10px;
 `;
 
+const Message = styled.div<{ $error?: boolean }>`
+    font-size: 13px;
+    color: ${({ theme, $error }) => ($error ? theme.colors.danger : theme.colors.muted)};
+`;
+
 const regionLabel = (value: string) => {
     if (value === '77') return '77 — Москва';
     if (value === '78') return '78 — Санкт-Петербург';
@@ -229,11 +241,54 @@ const regionLabel = (value: string) => {
     return '—';
 };
 
+const emptyDraft: AdminUser = {
+    id: '',
+    login: '',
+    password: '',
+    lastName: '',
+    firstName: '',
+    middleName: '',
+    role: 'user',
+    region: '',
+    isActive: true,
+};
+
 export function AdminPage() {
-    const dispatch = useAppDispatch();
-    const { serviceMode, users, isUserModalOpen, modalMode, userDraft } = useAppSelector(
-        (state) => state.admin,
-    );
+    const [serviceMode, setServiceMode] = useState<ServiceModeState>({
+        enabled: false,
+        message: '',
+    });
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [savingMode, setSavingMode] = useState(false);
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
+    const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+    const [userDraft, setUserDraft] = useState<AdminUser>(emptyDraft);
+
+    const loadData = async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const [serviceResponse, usersResponse] = await Promise.all([
+                apiRequest<{ success: true; data: ServiceModeState }>('/admin/service-mode'),
+                apiRequest<{ success: true; data: AdminUser[] }>('/admin/users'),
+            ]);
+
+            setServiceMode(serviceResponse.data);
+            setUsers(usersResponse.data);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const stats = useMemo(() => {
         return {
@@ -244,6 +299,74 @@ export function AdminPage() {
             users: users.filter((user) => user.role === 'user').length,
         };
     }, [users]);
+
+    const saveServiceMode = async (enabled: boolean) => {
+        setSavingMode(true);
+        setMessage('');
+        setError('');
+
+        try {
+            await apiRequest('/admin/service-mode', {
+                method: 'PUT',
+                json: {
+                    enabled,
+                    message: serviceMode.message,
+                },
+            });
+
+            setServiceMode((prev) => ({ ...prev, enabled }));
+            setMessage('Сервисный режим обновлён');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+        } finally {
+            setSavingMode(false);
+        }
+    };
+
+    const openCreate = () => {
+        setModalMode('create');
+        setUserDraft(emptyDraft);
+        setIsUserModalOpen(true);
+    };
+
+    const openEdit = (user: AdminUser) => {
+        setModalMode('edit');
+        setUserDraft(user);
+        setIsUserModalOpen(true);
+    };
+
+    const saveUser = async () => {
+        try {
+            if (modalMode === 'create') {
+                await apiRequest('/admin/users', {
+                    method: 'POST',
+                    json: userDraft,
+                });
+            } else {
+                await apiRequest(`/admin/users/${userDraft.id}`, {
+                    method: 'PUT',
+                    json: userDraft,
+                });
+            }
+
+            setIsUserModalOpen(false);
+            setUserDraft(emptyDraft);
+            await loadData();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ошибка сохранения пользователя');
+        }
+    };
+
+    const toggleUser = async (id: string | number) => {
+        try {
+            await apiRequest(`/admin/users/${id}/toggle-active`, {
+                method: 'PATCH',
+            });
+            await loadData();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ошибка изменения статуса пользователя');
+        }
+    };
 
     return (
         <PageWrap>
@@ -262,7 +385,11 @@ export function AdminPage() {
                     </div>
 
                     <Actions>
-                        <PrimaryButton type="button" onClick={() => dispatch(toggleServiceMode())}>
+                        <PrimaryButton
+                            type="button"
+                            onClick={() => saveServiceMode(!serviceMode.enabled)}
+                            disabled={savingMode}
+                        >
                             {serviceMode.enabled ? 'Выключить сервисный режим' : 'Включить сервисный режим'}
                         </PrimaryButton>
                     </Actions>
@@ -274,9 +401,17 @@ export function AdminPage() {
 
                 <Textarea
                     value={serviceMode.message}
-                    onChange={(e) => dispatch(setServiceModeMessage(e.target.value))}
+                    onChange={(e) =>
+                        setServiceMode((prev) => ({
+                            ...prev,
+                            message: e.target.value,
+                        }))
+                    }
                     placeholder="Текст объявления о технических работах"
                 />
+
+                {message ? <Message>{message}</Message> : null}
+                {error ? <Message $error>{error}</Message> : null}
             </TopCard>
 
             <TopCard>
@@ -284,13 +419,12 @@ export function AdminPage() {
                     <div>
                         <Title>Учетные записи</Title>
                         <Description>
-                            Всего: {stats.total} · Активных: {stats.active} · Неактивных: {stats.inactive} ·
-                            Администраторов: {stats.admins} · Пользователей: {stats.users}
+                            Всего: {stats.total} · Активных: {stats.active} · Неактивных: {stats.inactive} · Администраторов: {stats.admins} · Пользователей: {stats.users}
                         </Description>
                     </div>
 
                     <Actions>
-                        <PrimaryButton type="button" onClick={() => dispatch(openCreateUserModal())}>
+                        <PrimaryButton type="button" onClick={openCreate}>
                             Создать аккаунт
                         </PrimaryButton>
                     </Actions>
@@ -312,39 +446,49 @@ export function AdminPage() {
                         </tr>
                         </thead>
                         <tbody>
-                        {users.map((user) => (
-                            <tr key={user.id}>
-                                <Cell>{user.login}</Cell>
-                                <Cell>{user.password}</Cell>
-                                <Cell>{user.lastName}</Cell>
-                                <Cell>{user.firstName}</Cell>
-                                <Cell>{user.middleName || '—'}</Cell>
-                                <Cell>
-                                    <Badge $role={user.role}>{user.role === 'admin' ? 'Администратор' : 'Пользователь'}</Badge>
-                                </Cell>
-                                <Cell>{user.role === 'admin' ? '—' : regionLabel(user.region)}</Cell>
-                                <Cell>
-                                    <Badge $active={user.isActive}>{user.isActive ? 'Активен' : 'Деактивирован'}</Badge>
-                                </Cell>
-                                <Cell>
-                                    <RowActions>
-                                        <SmallButton type="button" onClick={() => dispatch(openEditUserModal(user.id))}>
-                                            Изменить
-                                        </SmallButton>
-                                        <SmallButton type="button" onClick={() => dispatch(toggleUserActive(user.id))}>
-                                            {user.isActive ? 'Деактивировать' : 'Активировать'}
-                                        </SmallButton>
-                                    </RowActions>
-                                </Cell>
+                        {loading ? (
+                            <tr>
+                                <Cell colSpan={9}>Загрузка...</Cell>
                             </tr>
-                        ))}
+                        ) : (
+                            users.map((user) => (
+                                <tr key={String(user.id)}>
+                                    <Cell>{user.login}</Cell>
+                                    <Cell>{user.password}</Cell>
+                                    <Cell>{user.lastName}</Cell>
+                                    <Cell>{user.firstName}</Cell>
+                                    <Cell>{user.middleName || '—'}</Cell>
+                                    <Cell>
+                                        <Badge $role={user.role}>
+                                            {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
+                                        </Badge>
+                                    </Cell>
+                                    <Cell>{user.role === 'admin' ? '—' : regionLabel(user.region)}</Cell>
+                                    <Cell>
+                                        <Badge $active={user.isActive}>
+                                            {user.isActive ? 'Активен' : 'Деактивирован'}
+                                        </Badge>
+                                    </Cell>
+                                    <Cell>
+                                        <RowActions>
+                                            <SmallButton type="button" onClick={() => openEdit(user)}>
+                                                Изменить
+                                            </SmallButton>
+                                            <SmallButton type="button" onClick={() => toggleUser(user.id)}>
+                                                {user.isActive ? 'Деактивировать' : 'Активировать'}
+                                            </SmallButton>
+                                        </RowActions>
+                                    </Cell>
+                                </tr>
+                            ))
+                        )}
                         </tbody>
                     </Table>
                 </TableWrap>
             </TopCard>
 
             {isUserModalOpen ? (
-                <Overlay onClick={() => dispatch(closeUserModal())}>
+                <Overlay onClick={() => setIsUserModalOpen(false)}>
                     <Modal onClick={(e) => e.stopPropagation()}>
                         <ModalHeader>
                             {modalMode === 'create' ? 'Создание аккаунта' : 'Редактирование аккаунта'}
@@ -355,7 +499,7 @@ export function AdminPage() {
                                 Логин
                                 <Input
                                     value={userDraft.login}
-                                    onChange={(e) => dispatch(updateUserDraft({ login: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, login: e.target.value }))}
                                 />
                             </Field>
 
@@ -363,7 +507,7 @@ export function AdminPage() {
                                 Пароль
                                 <Input
                                     value={userDraft.password}
-                                    onChange={(e) => dispatch(updateUserDraft({ password: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, password: e.target.value }))}
                                 />
                             </Field>
 
@@ -371,7 +515,7 @@ export function AdminPage() {
                                 Фамилия
                                 <Input
                                     value={userDraft.lastName}
-                                    onChange={(e) => dispatch(updateUserDraft({ lastName: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, lastName: e.target.value }))}
                                 />
                             </Field>
 
@@ -379,7 +523,7 @@ export function AdminPage() {
                                 Имя
                                 <Input
                                     value={userDraft.firstName}
-                                    onChange={(e) => dispatch(updateUserDraft({ firstName: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, firstName: e.target.value }))}
                                 />
                             </Field>
 
@@ -387,7 +531,7 @@ export function AdminPage() {
                                 Отчество
                                 <Input
                                     value={userDraft.middleName}
-                                    onChange={(e) => dispatch(updateUserDraft({ middleName: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, middleName: e.target.value }))}
                                 />
                             </Field>
 
@@ -396,7 +540,11 @@ export function AdminPage() {
                                 <Select
                                     value={userDraft.role}
                                     onChange={(e) =>
-                                        dispatch(updateUserDraft({ role: e.target.value as 'admin' | 'user' }))
+                                        setUserDraft((prev) => ({
+                                            ...prev,
+                                            role: e.target.value as 'admin' | 'user',
+                                            region: e.target.value === 'admin' ? '' : prev.region,
+                                        }))
                                     }
                                 >
                                     <option value="user">Пользователь</option>
@@ -408,7 +556,7 @@ export function AdminPage() {
                                 Регион
                                 <Select
                                     value={userDraft.region}
-                                    onChange={(e) => dispatch(updateUserDraft({ region: e.target.value }))}
+                                    onChange={(e) => setUserDraft((prev) => ({ ...prev, region: e.target.value }))}
                                     disabled={userDraft.role === 'admin'}
                                 >
                                     <option value="">Не выбран</option>
@@ -423,7 +571,10 @@ export function AdminPage() {
                                 <Select
                                     value={String(userDraft.isActive)}
                                     onChange={(e) =>
-                                        dispatch(updateUserDraft({ isActive: e.target.value === 'true' }))
+                                        setUserDraft((prev) => ({
+                                            ...prev,
+                                            isActive: e.target.value === 'true',
+                                        }))
                                     }
                                 >
                                     <option value="true">Активен</option>
@@ -433,10 +584,10 @@ export function AdminPage() {
                         </ModalBody>
 
                         <ModalFooter>
-                            <SecondaryButton type="button" onClick={() => dispatch(closeUserModal())}>
+                            <SecondaryButton type="button" onClick={() => setIsUserModalOpen(false)}>
                                 Отмена
                             </SecondaryButton>
-                            <PrimaryButton type="button" onClick={() => dispatch(saveUserDraft())}>
+                            <PrimaryButton type="button" onClick={saveUser}>
                                 Сохранить
                             </PrimaryButton>
                         </ModalFooter>

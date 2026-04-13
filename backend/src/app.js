@@ -1,0 +1,41 @@
+import express from 'express';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+
+import { authRouter } from './routes/auth.routes.js';
+import { adminRouter } from './routes/admin.routes.js';
+import { feedbackRouter } from './routes/feedback.routes.js';
+import { meRouter } from './routes/me.routes.js';
+
+export const app = express();
+
+app.use(
+    cors({
+        origin: process.env.CLIENT_URL || 'http://localhost:5173',
+        credentials: true,
+    })
+);
+
+app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
+
+app.get('/api/health', (_req, res) => {
+    res.json({
+        success: true,
+        message: 'API is working',
+    });
+});
+
+app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/feedback', feedbackRouter);
+app.use('/api/me', meRouter);
+
+app.use((err, _req, res, _next) => {
+    console.error(err);
+
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error',
+    });
+});

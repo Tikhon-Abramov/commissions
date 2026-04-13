@@ -208,7 +208,12 @@ export function AppShell() {
     { label: 'Рейтинг МО', to: '/rating' },
     { label: 'Документы', to: '/documents' },
     { label: 'Обратная связь', to: '/feedback', badge: unreadCount },
-    ...(isAdmin ? [{ label: 'Админка', to: '/admin' }] : []),
+    ...(isAdmin
+        ? [
+          { label: 'Статистика регионов', to: '/region-stats' },
+          { label: 'Админка', to: '/admin' },
+        ]
+        : []),
   ];
 
   useEffect(() => {
@@ -269,7 +274,8 @@ export function AppShell() {
 
             <TopBarRight>
               <UserName title={displayName}>
-                {displayName}{isAdmin ? ' · Администратор' : ''}
+                {displayName}
+                {isAdmin ? ' · Администратор' : ''}
               </UserName>
 
               <ThemeButton type="button" onClick={() => dispatch(toggleTheme())}>

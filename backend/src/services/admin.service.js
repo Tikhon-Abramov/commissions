@@ -1,0 +1,122 @@
+import { pool } from '../db/pool.js';
+import { getServiceModeState } from './auth.service.js';
+
+export async function getUsers() {
+    const [rows] = await pool.query(
+        `
+      SELECT
+        id,
+        username,
+        password,
+        surname,
+        name,
+        patronymic,
+        isAdmin,
+        region
+      FROM users
+      ORDER BY id DESC
+    `
+    );
+
+    return rows.map((row) => ({
+        id: row.id,
+        login: row.username,
+        password: row.password,
+        lastName: row.surname || '',
+        firstName: row.name || '',
+        middleName: row.patronymic || '',
+        role: Number(row.isAdmin) === 1 ? 'admin' : 'user',
+        region: Number(row.isAdmin) === 1 ? '' : row.region || '',
+        isActive: true,
+    }));
+}
+
+export async function createUser(payload) {
+    await pool.query(
+        `
+      INSERT INTO users (
+        username,
+        password,
+        surname,
+        name,
+        patronymic,
+        isAdmin,
+        region
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+        [
+            payload.login,
+            payload.password,
+            payload.lastName,
+            payload.firstName,
+            payload.middleName || '',
+            payload.role === 'admin' ? 1 : 0,
+            payload.role === 'admin' ? null : payload.region || '',
+        ]
+    );
+}
+
+export async function updateUser(userId, payload) {
+    await pool.query(
+        `
+      UPDATE users
+      SET
+        username = ?,
+        password = ?,
+        surname = ?,
+        name = ?,
+        patronymic = ?,
+        isAdmin = ?,
+        region = ?
+      WHERE id = ?
+    `,
+        [
+            payload.login,
+            payload.password,
+            payload.lastName,
+            payload.firstName,
+            payload.middleName || '',
+            payload.role === 'admin' ? 1 : 0,
+            payload.role === 'admin' ? null : payload.region || '',
+            userId,
+        ]
+    );
+}
+
+export async function toggleUserActive(_userId) {
+    // В старой схеме users нет явного is_active.
+    // Пока возвращаем controlled error, чтобы не делать опасный delete.
+    const error = new Error(
+        'В legacy-таблице users нет поля активности. Для деактивации лучше сначала добавить is_active в БД.'
+    );
+    error.status = 400;
+    throw error;
+}
+
+export async function getServiceMode() {
+    return getServiceModeState();
+}
+
+export async function updateServiceMode({ enabled, message }) {
+    await pool.query(
+        `
+      INSERT INTO settings (parameter, value)
+      VALUES ('maintenance', ?)
+      ON DUPLICATE KEY UPDATE value = VALUES(value)
+    `,
+        [enabled ? '1' : '0']
+    );
+
+    await pool.query(
+        `
+      INSERT INTO settings (parameter, value)
+      VALUES ('maintenance_text', ?)
+      ON DUPLICATE KEY UPDATE value = VALUES(value)
+    `,
+        [
+            message ||
+            'Проводятся технические работы. Вход для пользователей временно недоступен.',
+        ]
+    );
+}
