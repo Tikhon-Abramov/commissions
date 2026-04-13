@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit';
+
 import authReducer from '../features/auth/authSlice';
+import themeReducer from '../features/theme/themeSlice';
 import commissionsReducer from '../features/commissions/commissionsSlice';
 import moReducer from '../features/mo/moSlice';
 import ratingReducer from '../features/rating/ratingSlice';
 import secondLevelDebtReducer from '../features/secondLevelDebt/secondLevelDebtSlice';
-import themeReducer from '../features/theme/themeSlice';
 import feedbackReducer from '../features/feedback/feedbackSlice';
+import adminReducer from '../features/admin/adminSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +18,7 @@ export const store = configureStore({
     rating: ratingReducer,
     secondLevelDebt: secondLevelDebtReducer,
     feedback: feedbackReducer,
+    admin: adminReducer,
   },
 });
 

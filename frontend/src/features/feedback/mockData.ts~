@@ -71,7 +71,6 @@ export const feedbackMessagesMock: FeedbackMessage[] = [
             name: 'screenshot.png',
             type: 'image/png',
             size: 204800,
-            url: '#',
         },
     },
     {

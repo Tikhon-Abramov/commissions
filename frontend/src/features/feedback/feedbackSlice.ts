@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type {
+    FeedbackAttachment,
     FeedbackDraftTemplate,
     FeedbackMessage,
     FeedbackTicket,
@@ -31,17 +32,12 @@ const initialState: FeedbackState = {
     replyText: '',
 };
 
-const buildTicketMessage = (draft: FeedbackDraftTemplate) =>
-    `Тема: ${draft.topic}
+const isFinalStatus = (status: TicketStatus) => status === 'resolved' || status === 'closed';
 
-Описание проблемы:
-${draft.problem}
-
-Ожидаемый результат:
-${draft.expectedResult}
-
-Контакты:
-${draft.contacts}`;
+const buildSubject = (draft: FeedbackDraftTemplate) => {
+    const firstLine = draft.text.trim().split('\n')[0] || 'Новое обращение';
+    return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine;
+};
 
 const feedbackSlice = createSlice({
     name: 'feedback',
@@ -50,25 +46,35 @@ const feedbackSlice = createSlice({
         setFeedbackStatusFilter(state, action: PayloadAction<'all' | TicketStatus>) {
             state.statusFilter = action.payload;
         },
+
         selectFeedbackTicket(state, action: PayloadAction<string>) {
             state.selectedTicketId = action.payload;
         },
+
         openCreateFeedbackModal(state) {
             state.isCreateModalOpen = true;
         },
+
         closeCreateFeedbackModal(state) {
             state.isCreateModalOpen = false;
             state.draftTemplate = feedbackTemplateInitial;
         },
+
         updateFeedbackDraft(state, action: PayloadAction<Partial<FeedbackDraftTemplate>>) {
             state.draftTemplate = {
                 ...state.draftTemplate,
                 ...action.payload,
             };
         },
+
+        setFeedbackDraftAttachment(state, action: PayloadAction<FeedbackAttachment | null>) {
+            state.draftTemplate.attachment = action.payload;
+        },
+
         setFeedbackReplyText(state, action: PayloadAction<string>) {
             state.replyText = action.payload;
         },
+
         createFeedbackTicket(
             state,
             action: PayloadAction<{
@@ -78,13 +84,16 @@ const feedbackSlice = createSlice({
             }>,
         ) {
             const draft = state.draftTemplate;
+            const text = draft.text.trim();
+            if (!text) return;
+
             const now = new Date().toISOString();
             const ticketId = `t-${Date.now()}`;
             const messageId = `m-${Date.now()}`;
 
             const newTicket: FeedbackTicket = {
                 id: ticketId,
-                subject: draft.topic || 'Новое обращение',
+                subject: buildSubject(draft),
                 status: 'new',
                 regionCode: action.payload.regionCode,
                 regionName: action.payload.regionName,
@@ -93,7 +102,6 @@ const feedbackSlice = createSlice({
                 createdByUserId: action.payload.userId,
                 unreadForUser: 0,
                 unreadForAdmin: 1,
-                templateData: draft,
             };
 
             const firstMessage: FeedbackMessage = {
@@ -101,10 +109,11 @@ const feedbackSlice = createSlice({
                 ticketId,
                 authorRole: 'user',
                 authorName: action.payload.regionName,
-                text: buildTicketMessage(draft),
+                text,
                 createdAt: now,
                 isReadByUser: true,
                 isReadByAdmin: false,
+                attachment: draft.attachment,
             };
 
             state.tickets.unshift(newTicket);
@@ -113,6 +122,7 @@ const feedbackSlice = createSlice({
             state.isCreateModalOpen = false;
             state.draftTemplate = feedbackTemplateInitial;
         },
+
         sendFeedbackReply(
             state,
             action: PayloadAction<{
@@ -124,6 +134,9 @@ const feedbackSlice = createSlice({
             const text = state.replyText.trim();
             if (!text) return;
 
+            const ticket = state.tickets.find((item) => item.id === action.payload.ticketId);
+            if (!ticket || isFinalStatus(ticket.status)) return;
+
             const now = new Date().toISOString();
             const message: FeedbackMessage = {
                 id: `m-${Date.now()}`,
@@ -134,28 +147,30 @@ const feedbackSlice = createSlice({
                 createdAt: now,
                 isReadByUser: action.payload.authorRole === 'user',
                 isReadByAdmin: action.payload.authorRole === 'admin',
+                attachment: null,
             };
 
             state.messages.push(message);
             state.replyText = '';
 
-            state.tickets = state.tickets.map((ticket) =>
-                ticket.id === action.payload.ticketId
+            state.tickets = state.tickets.map((item) =>
+                item.id === action.payload.ticketId
                     ? {
-                        ...ticket,
+                        ...item,
                         updatedAt: now,
                         unreadForUser:
                             action.payload.authorRole === 'admin'
-                                ? ticket.unreadForUser + 1
-                                : ticket.unreadForUser,
+                                ? item.unreadForUser + 1
+                                : item.unreadForUser,
                         unreadForAdmin:
                             action.payload.authorRole === 'user'
-                                ? ticket.unreadForAdmin + 1
-                                : ticket.unreadForAdmin,
+                                ? item.unreadForAdmin + 1
+                                : item.unreadForAdmin,
                     }
-                    : ticket,
+                    : item,
             );
         },
+
         markFeedbackTicketRead(
             state,
             action: PayloadAction<{
@@ -164,27 +179,37 @@ const feedbackSlice = createSlice({
             }>,
         ) {
             const { ticketId, viewerRole } = action.payload;
+            const ticket = state.tickets.find((item) => item.id === ticketId);
+            if (!ticket) return;
 
-            state.messages = state.messages.map((message) =>
-                message.ticketId === ticketId
-                    ? {
-                        ...message,
-                        isReadByUser: viewerRole === 'user' ? true : message.isReadByUser,
-                        isReadByAdmin: viewerRole === 'admin' ? true : message.isReadByAdmin,
-                    }
-                    : message,
-            );
+            const alreadyRead =
+                viewerRole === 'user'
+                    ? ticket.unreadForUser === 0
+                    : ticket.unreadForAdmin === 0;
 
-            state.tickets = state.tickets.map((ticket) =>
-                ticket.id === ticketId
+            if (alreadyRead) return;
+
+            state.messages = state.messages.map((message) => {
+                if (message.ticketId !== ticketId) return message;
+
+                if (viewerRole === 'user') {
+                    return message.isReadByUser ? message : { ...message, isReadByUser: true };
+                }
+
+                return message.isReadByAdmin ? message : { ...message, isReadByAdmin: true };
+            });
+
+            state.tickets = state.tickets.map((item) =>
+                item.id === ticketId
                     ? {
-                        ...ticket,
-                        unreadForUser: viewerRole === 'user' ? 0 : ticket.unreadForUser,
-                        unreadForAdmin: viewerRole === 'admin' ? 0 : ticket.unreadForAdmin,
+                        ...item,
+                        unreadForUser: viewerRole === 'user' ? 0 : item.unreadForUser,
+                        unreadForAdmin: viewerRole === 'admin' ? 0 : item.unreadForAdmin,
                     }
-                    : ticket,
+                    : item,
             );
         },
+
         updateFeedbackTicketStatus(
             state,
             action: PayloadAction<{
@@ -194,15 +219,37 @@ const feedbackSlice = createSlice({
         ) {
             const now = new Date().toISOString();
 
-            state.tickets = state.tickets.map((ticket) =>
-                ticket.id === action.payload.ticketId
-                    ? {
-                        ...ticket,
-                        status: action.payload.status,
-                        updatedAt: now,
-                    }
-                    : ticket,
-            );
+            state.tickets = state.tickets.map((ticket) => {
+                if (ticket.id !== action.payload.ticketId) return ticket;
+
+                if (isFinalStatus(ticket.status)) {
+                    return ticket;
+                }
+
+                if (ticket.status === 'new' && action.payload.status === 'new') {
+                    return ticket;
+                }
+
+                if (
+                    ticket.status === 'new' &&
+                    !['in_progress', 'resolved', 'closed'].includes(action.payload.status)
+                ) {
+                    return ticket;
+                }
+
+                if (
+                    ticket.status === 'in_progress' &&
+                    !['resolved', 'closed'].includes(action.payload.status)
+                ) {
+                    return ticket;
+                }
+
+                return {
+                    ...ticket,
+                    status: action.payload.status,
+                    updatedAt: now,
+                };
+            });
         },
     },
 });
@@ -213,6 +260,7 @@ export const {
     openCreateFeedbackModal,
     closeCreateFeedbackModal,
     updateFeedbackDraft,
+    setFeedbackDraftAttachment,
     setFeedbackReplyText,
     createFeedbackTicket,
     sendFeedbackReply,

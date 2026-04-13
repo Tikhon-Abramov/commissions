@@ -7,7 +7,6 @@ export type FeedbackAttachment = {
     name: string;
     type: string;
     size: number;
-    url: string;
 };
 
 export type FeedbackMessage = {

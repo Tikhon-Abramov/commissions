@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { PageHeader } from '../components/common/PageHeader';
@@ -9,13 +9,14 @@ import {
     openCreateFeedbackModal,
     selectFeedbackTicket,
     sendFeedbackReply,
+    setFeedbackDraftAttachment,
     setFeedbackReplyText,
     setFeedbackStatusFilter,
     updateFeedbackDraft,
     updateFeedbackTicketStatus,
 } from '../features/feedback/feedbackSlice';
 import { feedbackStatuses } from '../features/feedback/mockData';
-import type { TicketStatus } from '../types/feedback';
+import type { FeedbackAttachment, TicketStatus } from '../types/feedback';
 
 const statusLabels: Record<TicketStatus, string> = {
     new: 'Новый',
@@ -24,299 +25,404 @@ const statusLabels: Record<TicketStatus, string> = {
     closed: 'Закрыт',
 };
 
+const isFinalStatus = (status: TicketStatus) => status === 'resolved' || status === 'closed';
+
+const Root = styled.div`
+    height: calc(100dvh - 168px);
+    min-height: 0;
+    max-height: calc(100dvh - 168px);
+    overflow: hidden;
+`;
+
 const PageWrap = styled.div`
-  display: grid;
-  gap: 16px;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 16px;
+    overflow: hidden;
+`;
+
+const HeaderBlock = styled.div`
+    min-height: 0;
 `;
 
 const Toolbar = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-height: 0;
 `;
 
 const StatsRow = styled.div`
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 `;
 
-const StatChip = styled.div`
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  font-size: 13px;
+const StatChip = styled.button<{ $active?: boolean }>`
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: ${({ theme, $active }) => ($active ? theme.colors.primarySoft : theme.colors.surface)};
+    border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.border)};
+    color: ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.text)};
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.15s ease;
+
+    &:hover {
+        border-color: ${({ theme }) => theme.colors.primary};
+    }
 `;
 
 const Controls = styled.div`
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 `;
 
 const Select = styled.select`
-  height: 42px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.surface};
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const PrimaryButton = styled.button`
-  height: 42px;
-  padding: 0 16px;
-  border-radius: 12px;
-  border: none;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: none;
+    background: ${({ theme }) => theme.colors.primary};
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 `;
 
 const Layout = styled.div`
-  display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 16px;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 16px;
+    overflow: hidden;
 
-  @media (max-width: 980px) {
-    grid-template-columns: 1fr;
-  }
+    @media (max-width: 980px) {
+        grid-template-columns: 1fr;
+    }
 `;
 
 const Sidebar = styled.div`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 18px;
-  background: ${({ theme }) => theme.colors.surface};
-  overflow: hidden;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    border-radius: 18px;
+    background: ${({ theme }) => theme.colors.surface};
+    overflow: hidden;
+    display: grid;
 `;
 
 const TicketList = styled.div`
-  display: grid;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
 `;
 
 const TicketItem = styled.button<{ $active?: boolean }>`
-  padding: 14px 16px;
-  border: none;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme, $active }) => ($active ? theme.colors.surfaceAlt : theme.colors.surface)};
-  text-align: left;
-  cursor: pointer;
+    padding: 14px 16px;
+    border: none;
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme, $active }) => ($active ? theme.colors.surfaceAlt : theme.colors.surface)};
+    text-align: left;
+    cursor: pointer;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const TicketTop = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: flex-start;
 `;
 
 const TicketSubject = styled.div`
-  font-size: 14px;
-  font-weight: 600;
+    font-size: 14px;
+    font-weight: 600;
+    word-break: break-word;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const TicketMeta = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.muted};
-  margin-top: 6px;
+    font-size: 12px;
+    color: ${({ theme }) => theme.colors.muted};
+    margin-top: 6px;
 `;
 
 const StatusBadge = styled.span<{ $status: TicketStatus }>`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 84px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  background: ${({ $status }) => {
-    if ($status === 'new') return 'rgba(59, 130, 246, 0.12)';
-    if ($status === 'in_progress') return 'rgba(245, 158, 11, 0.14)';
-    if ($status === 'resolved') return 'rgba(34, 197, 94, 0.14)';
-    return 'rgba(107, 114, 128, 0.14)';
-}};
-  color: ${({ $status }) => {
-    if ($status === 'new') return '#2563eb';
-    if ($status === 'in_progress') return '#d97706';
-    if ($status === 'resolved') return '#16a34a';
-    return '#6b7280';
-}};
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 84px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: ${({ $status }) => {
+        if ($status === 'new') return 'rgba(59, 130, 246, 0.12)';
+        if ($status === 'in_progress') return 'rgba(245, 158, 11, 0.14)';
+        if ($status === 'resolved') return 'rgba(34, 197, 94, 0.14)';
+        return 'rgba(107, 114, 128, 0.14)';
+    }};
+    color: ${({ $status, theme }) => {
+        if ($status === 'new') return '#60a5fa';
+        if ($status === 'in_progress') return '#fbbf24';
+        if ($status === 'resolved') return '#4ade80';
+        return theme.colors.muted;
+    }};
 `;
 
 const UnreadDot = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: ${({ theme }) => theme.colors.primary};
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
 `;
 
 const EmptyBox = styled.div`
-  padding: 28px 20px;
-  color: ${({ theme }) => theme.colors.muted};
+    padding: 28px 20px;
+    color: ${({ theme }) => theme.colors.muted};
 `;
 
 const ChatCard = styled.div`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 18px;
-  background: ${({ theme }) => theme.colors.surface};
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  min-height: 620px;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    border-radius: 18px;
+    background: ${({ theme }) => theme.colors.surface};
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
 `;
 
 const ChatHeader = styled.div`
-  padding: 16px 18px;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+    padding: 16px 18px;
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
 `;
 
 const ChatTitle = styled.div`
-  font-size: 16px;
-  font-weight: 700;
+    font-size: 16px;
+    font-weight: 700;
+    word-break: break-word;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const ChatSubtitle = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.muted};
-  margin-top: 4px;
+    font-size: 12px;
+    color: ${({ theme }) => theme.colors.muted};
+    margin-top: 4px;
 `;
 
 const HeaderActions = styled.div`
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 `;
 
 const Messages = styled.div`
-  padding: 18px;
-  display: grid;
-  gap: 12px;
-  align-content: start;
-  max-height: 100%;
-  overflow-y: auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    overflow-y: auto;
+    overflow-x: hidden;
 `;
 
 const MessageBubble = styled.div<{ $mine?: boolean }>`
-  max-width: 78%;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: ${({ theme, $mine }) => ($mine ? theme.colors.primarySoft : theme.colors.surfaceAlt)};
-  justify-self: ${({ $mine }) => ($mine ? 'end' : 'start')};
-  white-space: pre-wrap;
+    max-width: min(78%, 760px);
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: ${({ theme, $mine }) => ($mine ? theme.colors.primarySoft : theme.colors.surfaceAlt)};
+    color: ${({ theme }) => theme.colors.text};
+    justify-self: ${({ $mine }) => ($mine ? 'end' : 'start')};
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 `;
 
 const MessageAuthor = styled.div`
-  font-size: 11px;
-  font-weight: 700;
-  margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: ${({ theme }) => theme.colors.text};
+`;
+
+const MessageAttachment = styled.a`
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: ${({ theme }) => theme.colors.background};
+    color: ${({ theme }) => theme.colors.primary};
+    font-size: 12px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    width: fit-content;
+
+    &:hover {
+        text-decoration: underline;
+    }
 `;
 
 const MessageTime = styled.div`
-  margin-top: 8px;
-  font-size: 11px;
-  color: ${({ theme }) => theme.colors.muted};
+    margin-top: 8px;
+    font-size: 11px;
+    color: ${({ theme }) => theme.colors.muted};
 `;
 
 const ReplyBox = styled.div`
-  padding: 16px 18px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  display: grid;
-  gap: 10px;
+    padding: 16px 18px;
+    border-top: 1px solid ${({ theme }) => theme.colors.border};
+    display: grid;
+    gap: 10px;
 `;
 
 const Textarea = styled.textarea`
-  min-height: 92px;
-  resize: vertical;
-  border-radius: 14px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
-  padding: 12px 14px;
+    min-height: 92px;
+    max-height: 180px;
+    resize: vertical;
+    border-radius: 14px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.background};
+    color: ${({ theme }) => theme.colors.text};
+    padding: 12px 14px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+
+    &::placeholder {
+        color: ${({ theme }) => theme.colors.muted};
+    }
 `;
 
 const ReplyActions = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
 `;
 
 const SecondaryButton = styled.button`
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  cursor: pointer;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.surface};
+    color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
 `;
 
 const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1200;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
 `;
 
 const Modal = styled.div`
-  width: min(720px, calc(100vw - 32px));
-  background: ${({ theme }) => theme.colors.surface};
-  border-radius: 20px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  overflow: hidden;
+    width: min(720px, calc(100vw - 32px));
+    background: ${({ theme }) => theme.colors.surface};
+    border-radius: 20px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    overflow: hidden;
 `;
 
 const ModalHeader = styled.div`
-  padding: 18px 20px;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  font-size: 18px;
-  font-weight: 700;
+    padding: 18px 20px;
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+    font-size: 18px;
+    font-weight: 700;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const ModalBody = styled.div`
-  padding: 18px 20px;
-  display: grid;
-  gap: 14px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 14px;
 `;
 
 const Field = styled.label`
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
-const Input = styled.input`
-  height: 42px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
+const Dropzone = styled.label<{ $dragging?: boolean }>`
+    min-height: 120px;
+    border-radius: 14px;
+    border: 2px dashed ${({ theme, $dragging }) => ($dragging ? theme.colors.primary : theme.colors.border)};
+    background: ${({ theme, $dragging }) => ($dragging ? theme.colors.primarySoft : theme.colors.background)};
+    color: ${({ theme }) => theme.colors.text};
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 16px;
+    cursor: pointer;
+`;
+
+const HiddenInput = styled.input`
+    display: none;
+`;
+
+const AttachmentMeta = styled.div`
+    margin-top: 8px;
+    font-size: 12px;
+    color: ${({ theme }) => theme.colors.muted};
 `;
 
 const ModalFooter = styled.div`
-  padding: 16px 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid ${({ theme }) => theme.colors.border};
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 `;
 
 const formatDateTime = (value: string) =>
@@ -335,6 +441,14 @@ const regionNameFromCode = (code?: string | null) => {
     return 'Регион пользователя';
 };
 
+const formatAttachment = (file: File): FeedbackAttachment => ({
+    id: `att-${Date.now()}`,
+    name: file.name,
+    type: file.type || 'application/octet-stream',
+    size: file.size,
+    url: URL.createObjectURL(file),
+});
+
 export function FeedbackPage() {
     const dispatch = useAppDispatch();
     const { isAdmin, region } = useAppSelector((state) => state.auth);
@@ -347,6 +461,8 @@ export function FeedbackPage() {
         draftTemplate,
         replyText,
     } = useAppSelector((state) => state.feedback);
+
+    const [isDragging, setIsDragging] = useState(false);
 
     const currentUserId = isAdmin ? 'admin-1' : `user-${region ?? '77'}`;
     const currentRegionName = regionNameFromCode(region);
@@ -400,6 +516,9 @@ export function FeedbackPage() {
 
     useEffect(() => {
         if (!selectedTicket) return;
+        const unread = isAdmin ? selectedTicket.unreadForAdmin : selectedTicket.unreadForUser;
+        if (!unread) return;
+
         dispatch(
             markFeedbackTicketRead({
                 ticketId: selectedTicket.id,
@@ -420,7 +539,7 @@ export function FeedbackPage() {
     }, [currentUserId, isAdmin, tickets]);
 
     const handleSendReply = () => {
-        if (!selectedTicket) return;
+        if (!selectedTicket || isFinalStatus(selectedTicket.status)) return;
 
         dispatch(
             sendFeedbackReply({
@@ -431,266 +550,351 @@ export function FeedbackPage() {
         );
     };
 
+    const applyFile = (file?: File | null) => {
+        if (!file) {
+            dispatch(setFeedbackDraftAttachment(null));
+            return;
+        }
+        dispatch(setFeedbackDraftAttachment(formatAttachment(file)));
+    };
+
     return (
-        <PageWrap>
-            <PageHeader
-                title="Обратная связь"
-                description={`Обращения и переписка с поддержкой.${unreadCount ? ` Непрочитано: ${unreadCount}.` : ''}`}
-            />
+        <Root>
+            <PageWrap>
+                <HeaderBlock>
+                    <PageHeader
+                        title="Обратная связь"
+                        description={`Обращения и переписка с поддержкой.${unreadCount ? ` Непрочитано: ${unreadCount}.` : ''}`}
+                    />
+                </HeaderBlock>
 
-            <Toolbar>
-                <StatsRow>
-                    <StatChip>Всего: {stats.total}</StatChip>
-                    <StatChip>Новых: {stats.new}</StatChip>
-                    <StatChip>В работе: {stats.in_progress}</StatChip>
-                    <StatChip>Решённых: {stats.resolved}</StatChip>
-                    <StatChip>Закрытых: {stats.closed}</StatChip>
-                </StatsRow>
+                <Toolbar>
+                    <StatsRow>
+                        <StatChip
+                            type="button"
+                            $active={statusFilter === 'all'}
+                            onClick={() => dispatch(setFeedbackStatusFilter('all'))}
+                        >
+                            Всего: {stats.total}
+                        </StatChip>
+                        <StatChip
+                            type="button"
+                            $active={statusFilter === 'new'}
+                            onClick={() => dispatch(setFeedbackStatusFilter('new'))}
+                        >
+                            Новых: {stats.new}
+                        </StatChip>
+                        <StatChip
+                            type="button"
+                            $active={statusFilter === 'in_progress'}
+                            onClick={() => dispatch(setFeedbackStatusFilter('in_progress'))}
+                        >
+                            В работе: {stats.in_progress}
+                        </StatChip>
+                        <StatChip
+                            type="button"
+                            $active={statusFilter === 'resolved'}
+                            onClick={() => dispatch(setFeedbackStatusFilter('resolved'))}
+                        >
+                            Решённых: {stats.resolved}
+                        </StatChip>
+                        <StatChip
+                            type="button"
+                            $active={statusFilter === 'closed'}
+                            onClick={() => dispatch(setFeedbackStatusFilter('closed'))}
+                        >
+                            Закрытых: {stats.closed}
+                        </StatChip>
+                    </StatsRow>
 
-                <Controls>
-                    <Select
-                        value={statusFilter}
-                        onChange={(e) =>
-                            dispatch(setFeedbackStatusFilter(e.target.value as 'all' | TicketStatus))
-                        }
-                    >
-                        <option value="all">Все статусы</option>
-                        {feedbackStatuses.map((status) => (
-                            <option key={status.key} value={status.key}>
-                                {status.label}
-                            </option>
-                        ))}
-                    </Select>
+                    <Controls>
+                        <Select
+                            value={statusFilter}
+                            onChange={(e) =>
+                                dispatch(setFeedbackStatusFilter(e.target.value as 'all' | TicketStatus))
+                            }
+                        >
+                            <option value="all">Все статусы</option>
+                            {feedbackStatuses.map((status) => (
+                                <option key={status.key} value={status.key}>
+                                    {status.label}
+                                </option>
+                            ))}
+                        </Select>
 
-                    {!isAdmin ? (
-                        <PrimaryButton type="button" onClick={() => dispatch(openCreateFeedbackModal())}>
-                            Новое обращение
-                        </PrimaryButton>
-                    ) : null}
-                </Controls>
-            </Toolbar>
+                        {!isAdmin ? (
+                            <PrimaryButton type="button" onClick={() => dispatch(openCreateFeedbackModal())}>
+                                Новое обращение
+                            </PrimaryButton>
+                        ) : null}
+                    </Controls>
+                </Toolbar>
 
-            <Layout>
-                <Sidebar>
-                    {!visibleTickets.length ? (
-                        <EmptyBox>Обращения не найдены.</EmptyBox>
-                    ) : (
-                        <TicketList>
-                            {visibleTickets.map((ticket) => {
-                                const unread = isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser;
-
-                                return (
-                                    <TicketItem
-                                        key={ticket.id}
-                                        $active={ticket.id === selectedTicket?.id}
-                                        onClick={() => dispatch(selectFeedbackTicket(ticket.id))}
-                                    >
-                                        <TicketTop>
-                                            <TicketSubject>{ticket.subject}</TicketSubject>
-                                            <StatusBadge $status={ticket.status}>
-                                                {statusLabels[ticket.status]}
-                                            </StatusBadge>
-                                        </TicketTop>
-
-                                        <TicketMeta>
-                                            {ticket.regionName}
-                                            <br />
-                                            {formatDateTime(ticket.updatedAt)}
-                                        </TicketMeta>
-
-                                        {unread > 0 ? <div style={{ marginTop: 8 }}><UnreadDot>{unread}</UnreadDot></div> : null}
-                                    </TicketItem>
-                                );
-                            })}
-                        </TicketList>
-                    )}
-                </Sidebar>
-
-                <ChatCard>
-                    {!selectedTicket ? (
-                        <EmptyBox>Выберите обращение слева или создайте новое.</EmptyBox>
-                    ) : (
-                        <>
-                            <ChatHeader>
-                                <div>
-                                    <ChatTitle>{selectedTicket.subject}</ChatTitle>
-                                    <ChatSubtitle>
-                                        {selectedTicket.regionName} · {statusLabels[selectedTicket.status]}
-                                    </ChatSubtitle>
-                                </div>
-
-                                <HeaderActions>
-                                    {isAdmin ? (
-                                        <>
-                                            <SecondaryButton
-                                                type="button"
-                                                onClick={() =>
-                                                    dispatch(
-                                                        updateFeedbackTicketStatus({
-                                                            ticketId: selectedTicket.id,
-                                                            status: 'in_progress',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                В работу
-                                            </SecondaryButton>
-                                            <SecondaryButton
-                                                type="button"
-                                                onClick={() =>
-                                                    dispatch(
-                                                        updateFeedbackTicketStatus({
-                                                            ticketId: selectedTicket.id,
-                                                            status: 'resolved',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                Решён
-                                            </SecondaryButton>
-                                            <SecondaryButton
-                                                type="button"
-                                                onClick={() =>
-                                                    dispatch(
-                                                        updateFeedbackTicketStatus({
-                                                            ticketId: selectedTicket.id,
-                                                            status: 'closed',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                Закрыт
-                                            </SecondaryButton>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <SecondaryButton
-                                                type="button"
-                                                onClick={() =>
-                                                    dispatch(
-                                                        updateFeedbackTicketStatus({
-                                                            ticketId: selectedTicket.id,
-                                                            status: 'resolved',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                Отметить решённым
-                                            </SecondaryButton>
-                                            <SecondaryButton
-                                                type="button"
-                                                onClick={() =>
-                                                    dispatch(
-                                                        updateFeedbackTicketStatus({
-                                                            ticketId: selectedTicket.id,
-                                                            status: 'closed',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                Закрыть
-                                            </SecondaryButton>
-                                        </>
-                                    )}
-                                </HeaderActions>
-                            </ChatHeader>
-
-                            <Messages>
-                                {selectedMessages.map((message) => {
-                                    const mine =
-                                        (isAdmin && message.authorRole === 'admin') ||
-                                        (!isAdmin && message.authorRole === 'user');
+                <Layout>
+                    <Sidebar>
+                        {!visibleTickets.length ? (
+                            <EmptyBox>Обращения не найдены.</EmptyBox>
+                        ) : (
+                            <TicketList>
+                                {visibleTickets.map((ticket) => {
+                                    const unread = isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser;
 
                                     return (
-                                        <MessageBubble key={message.id} $mine={mine}>
-                                            <MessageAuthor>{message.authorName}</MessageAuthor>
-                                            <div>{message.text}</div>
-                                            <MessageTime>{formatDateTime(message.createdAt)}</MessageTime>
-                                        </MessageBubble>
+                                        <TicketItem
+                                            key={ticket.id}
+                                            $active={ticket.id === selectedTicket?.id}
+                                            onClick={() => dispatch(selectFeedbackTicket(ticket.id))}
+                                        >
+                                            <TicketTop>
+                                                <TicketSubject>{ticket.subject}</TicketSubject>
+                                                <StatusBadge $status={ticket.status}>
+                                                    {statusLabels[ticket.status]}
+                                                </StatusBadge>
+                                            </TicketTop>
+
+                                            <TicketMeta>
+                                                {ticket.regionName}
+                                                <br />
+                                                {formatDateTime(ticket.updatedAt)}
+                                            </TicketMeta>
+
+                                            {unread > 0 ? (
+                                                <div style={{ marginTop: 8 }}>
+                                                    <UnreadDot>{unread}</UnreadDot>
+                                                </div>
+                                            ) : null}
+                                        </TicketItem>
                                     );
                                 })}
-                            </Messages>
+                            </TicketList>
+                        )}
+                    </Sidebar>
 
-                            <ReplyBox>
-                                <Textarea
-                                    value={replyText}
-                                    onChange={(e) => dispatch(setFeedbackReplyText(e.target.value))}
-                                    placeholder="Введите сообщение..."
-                                />
+                    <ChatCard>
+                        {!selectedTicket ? (
+                            <EmptyBox>Выберите обращение слева или создайте новое.</EmptyBox>
+                        ) : (
+                            <>
+                                <ChatHeader>
+                                    <div>
+                                        <ChatTitle>{selectedTicket.subject}</ChatTitle>
+                                        <ChatSubtitle>
+                                            {selectedTicket.regionName} · {statusLabels[selectedTicket.status]}
+                                        </ChatSubtitle>
+                                    </div>
 
-                                <ReplyActions>
-                                    <div />
-                                    <PrimaryButton type="button" onClick={handleSendReply}>
-                                        Отправить
-                                    </PrimaryButton>
-                                </ReplyActions>
-                            </ReplyBox>
-                        </>
-                    )}
-                </ChatCard>
-            </Layout>
+                                    <HeaderActions>
+                                        {isAdmin ? (
+                                            <>
+                                                {selectedTicket.status === 'new' ? (
+                                                    <SecondaryButton
+                                                        type="button"
+                                                        onClick={() =>
+                                                            dispatch(
+                                                                updateFeedbackTicketStatus({
+                                                                    ticketId: selectedTicket.id,
+                                                                    status: 'in_progress',
+                                                                }),
+                                                            )
+                                                        }
+                                                    >
+                                                        В работу
+                                                    </SecondaryButton>
+                                                ) : null}
 
-            {isCreateModalOpen ? (
-                <Overlay onClick={() => dispatch(closeCreateFeedbackModal())}>
-                    <Modal onClick={(e) => e.stopPropagation()}>
-                        <ModalHeader>Новое обращение</ModalHeader>
+                                                {selectedTicket.status === 'new' || selectedTicket.status === 'in_progress' ? (
+                                                    <>
+                                                        <SecondaryButton
+                                                            type="button"
+                                                            onClick={() =>
+                                                                dispatch(
+                                                                    updateFeedbackTicketStatus({
+                                                                        ticketId: selectedTicket.id,
+                                                                        status: 'resolved',
+                                                                    }),
+                                                                )
+                                                            }
+                                                        >
+                                                            Решён
+                                                        </SecondaryButton>
+                                                        <SecondaryButton
+                                                            type="button"
+                                                            onClick={() =>
+                                                                dispatch(
+                                                                    updateFeedbackTicketStatus({
+                                                                        ticketId: selectedTicket.id,
+                                                                        status: 'closed',
+                                                                    }),
+                                                                )
+                                                            }
+                                                        >
+                                                            Закрыт
+                                                        </SecondaryButton>
+                                                    </>
+                                                ) : null}
+                                            </>
+                                        ) : (
+                                            <>
+                                                {!isFinalStatus(selectedTicket.status) ? (
+                                                    <>
+                                                        <SecondaryButton
+                                                            type="button"
+                                                            onClick={() =>
+                                                                dispatch(
+                                                                    updateFeedbackTicketStatus({
+                                                                        ticketId: selectedTicket.id,
+                                                                        status: 'resolved',
+                                                                    }),
+                                                                )
+                                                            }
+                                                        >
+                                                            Отметить решённым
+                                                        </SecondaryButton>
+                                                        <SecondaryButton
+                                                            type="button"
+                                                            onClick={() =>
+                                                                dispatch(
+                                                                    updateFeedbackTicketStatus({
+                                                                        ticketId: selectedTicket.id,
+                                                                        status: 'closed',
+                                                                    }),
+                                                                )
+                                                            }
+                                                        >
+                                                            Закрыть
+                                                        </SecondaryButton>
+                                                    </>
+                                                ) : null}
+                                            </>
+                                        )}
+                                    </HeaderActions>
+                                </ChatHeader>
 
-                        <ModalBody>
-                            <Field>
-                                Тема обращения
-                                <Input
-                                    value={draftTemplate.topic}
-                                    onChange={(e) => dispatch(updateFeedbackDraft({ topic: e.target.value }))}
-                                />
-                            </Field>
+                                <Messages>
+                                    {selectedMessages.map((message) => {
+                                        const mine =
+                                            (isAdmin && message.authorRole === 'admin') ||
+                                            (!isAdmin && message.authorRole === 'user');
 
-                            <Field>
-                                Описание проблемы
-                                <Textarea
-                                    value={draftTemplate.problem}
-                                    onChange={(e) => dispatch(updateFeedbackDraft({ problem: e.target.value }))}
-                                />
-                            </Field>
+                                        return (
+                                            <MessageBubble key={message.id} $mine={mine}>
+                                                <MessageAuthor>{message.authorName}</MessageAuthor>
+                                                <div>{message.text}</div>
+                                                {message.attachment ? (
+                                                    <MessageAttachment
+                                                        href={message.attachment.url}
+                                                        download={message.attachment.name}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        📎 Скачать: {message.attachment.name}
+                                                    </MessageAttachment>
+                                                ) : null}
+                                                <MessageTime>{formatDateTime(message.createdAt)}</MessageTime>
+                                            </MessageBubble>
+                                        );
+                                    })}
+                                </Messages>
 
-                            <Field>
-                                Ожидаемый результат
-                                <Textarea
-                                    value={draftTemplate.expectedResult}
-                                    onChange={(e) => dispatch(updateFeedbackDraft({ expectedResult: e.target.value }))}
-                                />
-                            </Field>
+                                <ReplyBox>
+                                    <Textarea
+                                        value={replyText}
+                                        onChange={(e) => dispatch(setFeedbackReplyText(e.target.value))}
+                                        placeholder={
+                                            isFinalStatus(selectedTicket.status)
+                                                ? 'Обращение завершено. Отправка сообщений недоступна.'
+                                                : 'Введите сообщение...'
+                                        }
+                                        disabled={isFinalStatus(selectedTicket.status)}
+                                    />
 
-                            <Field>
-                                Контакты для обратной связи
-                                <Input
-                                    value={draftTemplate.contacts}
-                                    onChange={(e) => dispatch(updateFeedbackDraft({ contacts: e.target.value }))}
-                                />
-                            </Field>
-                        </ModalBody>
+                                    <ReplyActions>
+                                        <div />
+                                        <PrimaryButton
+                                            type="button"
+                                            onClick={handleSendReply}
+                                            disabled={isFinalStatus(selectedTicket.status)}
+                                        >
+                                            Отправить
+                                        </PrimaryButton>
+                                    </ReplyActions>
+                                </ReplyBox>
+                            </>
+                        )}
+                    </ChatCard>
+                </Layout>
 
-                        <ModalFooter>
-                            <SecondaryButton type="button" onClick={() => dispatch(closeCreateFeedbackModal())}>
-                                Отмена
-                            </SecondaryButton>
-                            <PrimaryButton
-                                type="button"
-                                onClick={() =>
-                                    dispatch(
-                                        createFeedbackTicket({
-                                            userId: currentUserId,
-                                            regionCode: region ?? '77',
-                                            regionName: currentRegionName,
-                                        }),
-                                    )
-                                }
-                            >
-                                Отправить обращение
-                            </PrimaryButton>
-                        </ModalFooter>
-                    </Modal>
-                </Overlay>
-            ) : null}
-        </PageWrap>
+                {isCreateModalOpen ? (
+                    <Overlay onClick={() => dispatch(closeCreateFeedbackModal())}>
+                        <Modal onClick={(e) => e.stopPropagation()}>
+                            <ModalHeader>Новое обращение</ModalHeader>
+
+                            <ModalBody>
+                                <Field>
+                                    Прикрепить фото или файл
+                                    <Dropzone
+                                        $dragging={isDragging}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            setIsDragging(true);
+                                        }}
+                                        onDragLeave={() => setIsDragging(false)}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            setIsDragging(false);
+                                            applyFile(e.dataTransfer.files?.[0] ?? null);
+                                        }}
+                                    >
+                                        <div>
+                                            <div>Перетащите файл сюда или нажмите для выбора</div>
+                                            {draftTemplate.attachment ? (
+                                                <AttachmentMeta>
+                                                    📎 {draftTemplate.attachment.name}
+                                                </AttachmentMeta>
+                                            ) : (
+                                                <AttachmentMeta>Вложение необязательно</AttachmentMeta>
+                                            )}
+                                        </div>
+
+                                        <HiddenInput
+                                            type="file"
+                                            onChange={(e) => applyFile(e.target.files?.[0] ?? null)}
+                                        />
+                                    </Dropzone>
+                                </Field>
+
+                                <Field>
+                                    Текст обращения
+                                    <Textarea
+                                        value={draftTemplate.text}
+                                        onChange={(e) => dispatch(updateFeedbackDraft({ text: e.target.value }))}
+                                    />
+                                </Field>
+                            </ModalBody>
+
+                            <ModalFooter>
+                                <SecondaryButton type="button" onClick={() => dispatch(closeCreateFeedbackModal())}>
+                                    Отмена
+                                </SecondaryButton>
+                                <PrimaryButton
+                                    type="button"
+                                    onClick={() =>
+                                        dispatch(
+                                            createFeedbackTicket({
+                                                userId: currentUserId,
+                                                regionCode: region ?? '77',
+                                                regionName: currentRegionName,
+                                            }),
+                                        )
+                                    }
+                                >
+                                    Отправить обращение
+                                </PrimaryButton>
+                            </ModalFooter>
+                        </Modal>
+                    </Overlay>
+                ) : null}
+            </PageWrap>
+        </Root>
     );
 }

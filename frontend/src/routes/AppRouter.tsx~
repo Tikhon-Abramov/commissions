@@ -5,6 +5,7 @@ import { DocumentsPage } from '../pages/DocumentsPage';
 import {SecondLevelDebtPage} from '../pages/SecondLevelDebtPage';
 import { RatingPage } from '../pages/RatingPage';
 import { FeedbackPage } from '../pages/FeedbackPage';
+import { AdminPage } from '../pages/AdminPage';
 
 export function AppRouter() {
     return (
@@ -15,7 +16,8 @@ export function AppRouter() {
                 <Route path="mo" element={< SecondLevelDebtPage/>} />
                 <Route path="rating" element={<RatingPage />} />
                 <Route path="documents" element={<DocumentsPage />} />
-                
+                <Route path="feedback" element={<FeedbackPage />} />
+                <Route path="admin" element={<AdminPage />} />
                 <Route path="*" element={<Navigate to="/commissions" replace />} />
             </Route>
         </Routes>
