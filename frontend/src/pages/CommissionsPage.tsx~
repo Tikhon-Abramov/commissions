@@ -223,6 +223,18 @@ const getCurrentQuarterCode = () => {
     return `${now.getFullYear()}-Q${quarter}`;
 };
 
+const uniqueByInn = (items: CommissionItemDto[]) => {
+    const map = new Map<string, CommissionItemDto>();
+
+    for (const item of items) {
+        if (!map.has(item.inn)) {
+            map.set(item.inn, item);
+        }
+    }
+
+    return Array.from(map.values());
+};
+
 export function CommissionsPage() {
     const { isAdmin } = useAppSelector((state) => state.auth);
 
@@ -354,7 +366,9 @@ export function CommissionsPage() {
                 return;
             }
 
-            setList(listResponse.data.items);
+            const uniqueItems = uniqueByInn(listResponse.data.items);
+
+            setList(uniqueItems);
             setTotal(listResponse.data.total);
             setHasMore(listResponse.data.hasMore);
             setNextOffset(listResponse.data.nextOffset);
@@ -405,11 +419,7 @@ export function CommissionsPage() {
                 return;
             }
 
-            setList((prev) => {
-                const seen = new Set(prev.map((item) => item.inn));
-                const nextItems = response.data.items.filter((item) => !seen.has(item.inn));
-                return [...prev, ...nextItems];
-            });
+            setList((prev) => uniqueByInn([...prev, ...response.data.items]));
 
             setTotal(response.data.total);
             setHasMore(response.data.hasMore);
@@ -601,7 +611,7 @@ export function CommissionsPage() {
                             </Cell>
                         </tr>
                     ) : (
-                        sortedList.map((item, index) => {
+                        list.map((item, index) => {
                             const balanceMap = new Map(
                                 item.balances.map((balance) => [
                                     balance.date,

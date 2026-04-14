@@ -227,42 +227,54 @@ async function getBaseFilteredRows({
         userRegion,
     });
 
-    const latestSaldoJoin = schema.saldoPeriodCol && quarter
-        ? `
-    LEFT JOIN (
-      SELECT y.inn, y.latest_amount
-      FROM (
-        SELECT
-          s.${schema.saldoInnCol} AS inn,
-          CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS latest_amount,
-          ROW_NUMBER() OVER (
-            PARTITION BY s.${schema.saldoInnCol}
-            ORDER BY s.${schema.saldoDateCol} DESC
-          ) AS rn
-        FROM saldo s
-        WHERE s.${schema.saldoPeriodCol} = ?
-      ) y
-      WHERE y.rn = 1
-    ) ls ON ls.inn = m.${schema.metaInnCol}
-  `
-        : `
-    LEFT JOIN (
-      SELECT y.inn, y.latest_amount
-      FROM (
-        SELECT
-          s.${schema.saldoInnCol} AS inn,
-          CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS latest_amount,
-          ROW_NUMBER() OVER (
-            PARTITION BY s.${schema.saldoInnCol}
-            ORDER BY s.${schema.saldoDateCol} DESC
-          ) AS rn
-        FROM saldo s
-      ) y
-      WHERE y.rn = 1
-    ) ls ON ls.inn = m.${schema.metaInnCol}
-  `;
+    let latestGlobalDateSql = '';
+    let latestGlobalDateParams = [];
 
-    const countParams = schema.saldoPeriodCol && quarter ? [quarter, ...params] : params;
+    if (schema.saldoPeriodCol && quarter) {
+        latestGlobalDateSql = `
+      SELECT MAX(s.${schema.saldoDateCol}) AS latest_global_date
+      FROM saldo s
+      WHERE s.${schema.saldoPeriodCol} = ?
+    `;
+        latestGlobalDateParams = [quarter];
+    } else {
+        latestGlobalDateSql = `
+      SELECT MAX(s.${schema.saldoDateCol}) AS latest_global_date
+      FROM saldo s
+    `;
+    }
+
+    const [latestDateRows] = await pool.query(
+        latestGlobalDateSql,
+        latestGlobalDateParams,
+    );
+
+    const latestGlobalDate = latestDateRows[0]?.latest_global_date ?? null;
+
+    const latestSaldoJoin = latestGlobalDate
+        ? `
+      LEFT JOIN (
+        SELECT
+          s.${schema.saldoInnCol} AS inn,
+          CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS latest_amount
+        FROM saldo s
+        WHERE DATE(s.${schema.saldoDateCol}) = DATE(?)
+        ${schema.saldoPeriodCol && quarter ? `AND s.${schema.saldoPeriodCol} = ?` : ''}
+      ) ls ON ls.inn = m.${schema.metaInnCol}
+    `
+        : `
+      LEFT JOIN (
+        SELECT NULL AS inn, NULL AS latest_amount
+      ) ls ON 1 = 0
+    `;
+
+    const joinParams = latestGlobalDate
+        ? schema.saldoPeriodCol && quarter
+            ? [latestGlobalDate, quarter]
+            : [latestGlobalDate]
+        : [];
+
+    const countParams = [...joinParams, ...params];
 
     const [countRows] = await pool.query(
         `
@@ -271,32 +283,30 @@ async function getBaseFilteredRows({
       ${latestSaldoJoin}
       ${whereSql}
     `,
-        countParams
+        countParams,
     );
 
-    const listParams = schema.saldoPeriodCol && quarter
-        ? [quarter, ...params, limit, offset]
-        : [...params, limit, offset];
+    const listParams = [...joinParams, ...params, limit, offset];
 
     const [rows] = await pool.query(
         `
-            SELECT
-                m.${schema.metaInnCol} AS inn,
-                m.${schema.metaNameCol} AS name
-                ${schema.metaRegionCol ? `, m.${schema.metaRegionCol} AS region` : `, '' AS region`}
-      ${schema.metaKnoCol ? `, m.${schema.metaKnoCol} AS kno` : `, '' AS kno`},
-                    ls.latest_amount AS latest_amount_for_sort,
-                CASE
-                    WHEN ls.latest_amount IS NULL THEN 1
-                    ELSE 0
-                    END AS sort_is_empty
-            FROM meta m
-                ${latestSaldoJoin}
-                ${whereSql}
-            ORDER BY sort_is_empty ASC, latest_amount_for_sort DESC, m.${schema.metaNameCol} ASC
-                LIMIT ? OFFSET ?
-        `,
-        listParams
+      SELECT
+        m.${schema.metaInnCol} AS inn,
+        m.${schema.metaNameCol} AS name
+        ${schema.metaRegionCol ? `, m.${schema.metaRegionCol} AS region` : `, '' AS region`}
+        ${schema.metaKnoCol ? `, m.${schema.metaKnoCol} AS kno` : `, '' AS kno`},
+        ls.latest_amount AS latest_amount_for_sort,
+        CASE
+          WHEN ls.latest_amount IS NULL THEN 1
+          ELSE 0
+        END AS sort_is_empty
+      FROM meta m
+      ${latestSaldoJoin}
+      ${whereSql}
+      ORDER BY sort_is_empty ASC, latest_amount_for_sort DESC, m.${schema.metaNameCol} ASC
+      LIMIT ? OFFSET ?
+    `,
+        listParams,
     );
 
     return {
