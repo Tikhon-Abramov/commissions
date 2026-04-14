@@ -1,15 +1,15 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 export type AuthUserRole = 'admin' | 'user';
 
-interface AuthState {
+type AuthState = {
   userKey: string | null;
   username: string | null;
   fullName: string | null;
   isAdmin: boolean;
   role: AuthUserRole | null;
   region: string | null;
-}
+};
 
 const initialState: AuthState = {
   userKey: localStorage.getItem('userKey'),
@@ -17,7 +17,7 @@ const initialState: AuthState = {
   fullName: localStorage.getItem('fullName'),
   isAdmin: localStorage.getItem('isAdmin') === 'true',
   role: (localStorage.getItem('role') as AuthUserRole | null) ?? null,
-  region: localStorage.getItem('region'),
+  region: localStorage.getItem('region') || null,
 };
 
 const authSlice = createSlice({

@@ -1,38 +1,6 @@
 import { pool } from '../db/pool.js';
 import { getServiceModeState } from './auth.service.js';
 
-async function upsertSetting(param, value, name = null, comment = null) {
-    const [existing] = await pool.query(
-        `
-      SELECT id
-      FROM settings
-      WHERE param = ?
-      LIMIT 1
-    `,
-        [param]
-    );
-
-    if (existing.length) {
-        await pool.query(
-            `
-        UPDATE settings
-        SET value = ?
-        WHERE param = ?
-      `,
-            [value, param]
-        );
-        return;
-    }
-
-    await pool.query(
-        `
-      INSERT INTO settings (param, value, name, comment)
-      VALUES (?, ?, ?, ?)
-    `,
-        [param, value, name, comment]
-    );
-}
-
 export async function getUsers() {
     const [rows] = await pool.query(
         `
@@ -66,17 +34,17 @@ export async function getUsers() {
 export async function createUser(payload) {
     await pool.query(
         `
-            INSERT INTO users (
-                username,
-                password,
-                surname,
-                name,
-                patronymic,
-                isAdmin,
-                region
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `,
+      INSERT INTO users (
+        username,
+        password,
+        surname,
+        name,
+        patronymic,
+        isAdmin,
+        region
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
         [
             payload.login,
             payload.password,
@@ -84,7 +52,7 @@ export async function createUser(payload) {
             payload.firstName,
             payload.middleName || '',
             payload.role === 'admin' ? 1 : 0,
-            payload.role === 'admin' ? '' : payload.region || '',
+            payload.role === 'admin' ? null : payload.region || '',
         ]
     );
 }
@@ -110,7 +78,7 @@ export async function updateUser(userId, payload) {
             payload.firstName,
             payload.middleName || '',
             payload.role === 'admin' ? 1 : 0,
-            payload.role === 'admin' ? '' : payload.region || '',
+            payload.role === 'admin' ? null : payload.region || '',
             userId,
         ]
     );
@@ -129,18 +97,24 @@ export async function getServiceMode() {
 }
 
 export async function updateServiceMode({ enabled, message }) {
-    await upsertSetting(
-        'maintenance',
-        enabled ? '1' : '0',
-        'Сервисный режим',
-        '0 - выключен, 1 - включен'
+    await pool.query(
+        `
+      INSERT INTO settings (param, value)
+      VALUES ('maintenance', ?)
+      ON DUPLICATE KEY UPDATE value = VALUES(value)
+    `,
+        [enabled ? '1' : '0']
     );
 
-    await upsertSetting(
-        'maint_text',
-        message ||
-        'Проводятся технические работы. Вход для пользователей временно недоступен.',
-        'Текст сервисного режима',
-        'Текст сообщения для страницы авторизации'
+    await pool.query(
+        `
+      INSERT INTO settings (param, value)
+      VALUES ('maintenance_text', ?)
+      ON DUPLICATE KEY UPDATE value = VALUES(value)
+    `,
+        [
+            message ||
+            'Проводятся технические работы. Вход для пользователей временно недоступен.',
+        ]
     );
 }

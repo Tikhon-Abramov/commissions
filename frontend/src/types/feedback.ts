@@ -33,6 +33,7 @@ export type FeedbackTicket = {
     createdByUserId: string;
     unreadForUser: number;
     unreadForAdmin: number;
+    authorFullName?: string;
 };
 
 export type FeedbackStatusMeta = {

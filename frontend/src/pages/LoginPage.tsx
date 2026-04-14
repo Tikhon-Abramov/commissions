@@ -6,113 +6,113 @@ import { setCredentials } from '../features/auth/authSlice';
 import { apiRequest } from '../lib/api';
 
 const Page = styled.div`
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: ${({ theme }) => theme.colors.background};
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: ${({ theme }) => theme.colors.background};
 `;
 
 const Card = styled.div`
-  width: min(480px, 100%);
-  border-radius: 24px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
+    width: min(480px, 100%);
+    border-radius: 24px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.surface};
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
 `;
 
 const Header = styled.div`
-  padding: 24px 24px 12px;
+    padding: 24px 24px 12px;
 `;
 
 const Title = styled.h1`
-  margin: 0;
-  font-size: 28px;
-  color: ${({ theme }) => theme.colors.text};
+    margin: 0;
+    font-size: 28px;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const Description = styled.p`
-  margin: 10px 0 0;
-  color: ${({ theme }) => theme.colors.muted};
-  font-size: 14px;
-  line-height: 1.5;
+    margin: 10px 0 0;
+    color: ${({ theme }) => theme.colors.muted};
+    font-size: 14px;
+    line-height: 1.5;
 `;
 
 const MaintenanceBox = styled.div`
-  margin: 0 24px 16px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(245, 158, 11, 0.28);
-  background: rgba(245, 158, 11, 0.1);
-  color: ${({ theme }) => theme.colors.text};
-  font-size: 14px;
-  line-height: 1.5;
+    margin: 0 24px 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    background: rgba(245, 158, 11, 0.1);
+    color: ${({ theme }) => theme.colors.text};
+    font-size: 14px;
+    line-height: 1.5;
 `;
 
 const Form = styled.form`
-  padding: 0 24px 24px;
-  display: grid;
-  gap: 14px;
+    padding: 0 24px 24px;
+    display: grid;
+    gap: 14px;
 `;
 
 const Field = styled.label`
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: ${({ theme }) => theme.colors.text};
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: ${({ theme }) => theme.colors.text};
 `;
 
 const Input = styled.input`
-  height: 46px;
-  padding: 0 14px;
-  border-radius: 14px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
+    height: 46px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.background};
+    color: ${({ theme }) => theme.colors.text};
 
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.muted};
-  }
+    &::placeholder {
+        color: ${({ theme }) => theme.colors.muted};
+    }
 `;
 
 const ErrorText = styled.div`
-  color: ${({ theme }) => theme.colors.danger};
-  font-size: 13px;
+    color: ${({ theme }) => theme.colors.danger};
+    font-size: 13px;
 `;
 
 const Actions = styled.div`
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
 `;
 
 const PrimaryButton = styled.button`
-  height: 46px;
-  padding: 0 18px;
-  border-radius: 14px;
-  border: none;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 14px;
+    border: none;
+    background: ${({ theme }) => theme.colors.primary};
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
 
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 `;
 
 const SecondaryButton = styled.button`
-  height: 46px;
-  padding: 0 18px;
-  border-radius: 14px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  font-weight: 700;
-  cursor: pointer;
+    height: 46px;
+    padding: 0 18px;
+    border-radius: 14px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => theme.colors.surface};
+    color: ${({ theme }) => theme.colors.text};
+    font-weight: 700;
+    cursor: pointer;
 `;
 
 type ServiceModeResponse = {
@@ -220,7 +220,9 @@ export function LoginPage() {
             <Card>
                 <Header>
                     <Title>Вход в сервис</Title>
-                    <Description>Авторизуйтесь, чтобы продолжить работу в системе.</Description>
+                    <Description>
+                        Авторизуйтесь, чтобы продолжить работу в системе.
+                    </Description>
                 </Header>
 
                 {serviceMode.enabled ? (

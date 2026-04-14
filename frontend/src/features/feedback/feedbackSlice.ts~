@@ -36,6 +36,8 @@ const initialState: FeedbackState = {
     error: '',
 };
 
+const isFinalStatus = (status: TicketStatus) => status === 'resolved' || status === 'closed';
+
 const feedbackSlice = createSlice({
     name: 'feedback',
     initialState,
@@ -122,18 +124,22 @@ const feedbackSlice = createSlice({
             state.replyText = '';
         },
 
-        clearFeedbackState(state) {
-            state.tickets = [];
-            state.messages = [];
-            state.selectedTicketId = null;
-            state.statusFilter = 'all';
-            state.isCreateModalOpen = false;
-            state.draftTemplate = feedbackTemplateInitial;
-            state.replyText = '';
-            state.isLoadingTickets = false;
-            state.isLoadingMessages = false;
-            state.isSubmitting = false;
-            state.error = '';
+        updateFeedbackTicketStatusLocal(
+            state,
+            action: PayloadAction<{
+                ticketId: string;
+                status: TicketStatus;
+            }>,
+        ) {
+            state.tickets = state.tickets.map((ticket) => {
+                if (ticket.id !== action.payload.ticketId) return ticket;
+                if (isFinalStatus(ticket.status)) return ticket;
+
+                return {
+                    ...ticket,
+                    status: action.payload.status,
+                };
+            });
         },
     },
 });
@@ -154,7 +160,7 @@ export const {
     setFeedbackMessages,
     createFeedbackTicketSuccess,
     sendFeedbackReplySuccess,
-    clearFeedbackState,
+    updateFeedbackTicketStatusLocal,
 } = feedbackSlice.actions;
 
 export default feedbackSlice.reducer;

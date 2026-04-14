@@ -1,15 +1,16 @@
+import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { signToken } from '../utils/jwt.js';
 
-async function getSettingValue(parameter) {
+async function getSettingValue(param) {
     const [rows] = await pool.query(
         `
-      SELECT value
-      FROM settings
-      WHERE parameter = ?
-      LIMIT 1
-    `,
-        [parameter]
+            SELECT value
+            FROM settings
+            WHERE param = ?
+                LIMIT 1
+        `,
+        [param]
     );
 
     return rows[0]?.value ?? null;
@@ -17,7 +18,7 @@ async function getSettingValue(parameter) {
 
 export async function getServiceModeState() {
     const enabledValue = await getSettingValue('maintenance');
-    const messageValue = await getSettingValue('maintenance_text');
+    const messageValue = await getSettingValue('maint_text');
 
     return {
         enabled: String(enabledValue || '0') === '1',
@@ -27,22 +28,45 @@ export async function getServiceModeState() {
     };
 }
 
+function normalizePhpPasswordHash(hash) {
+    if (!hash) return '';
+    if (hash.startsWith('$2y$')) {
+        return `$2a$${hash.slice(4)}`;
+    }
+    return hash;
+}
+
+async function verifyLegacyPassword(plainPassword, storedHash) {
+    if (!storedHash) return false;
+
+    const normalizedHash = normalizePhpPasswordHash(String(storedHash));
+
+    if (
+        normalizedHash.startsWith('$2a$') ||
+        normalizedHash.startsWith('$2b$')
+    ) {
+        return bcrypt.compare(plainPassword, normalizedHash);
+    }
+
+    return String(storedHash) === String(plainPassword);
+}
+
 export async function loginUser({ username, password, adminOnly = false }) {
     const [rows] = await pool.query(
         `
-      SELECT
-        id,
-        username,
-        password,
-        surname,
-        name,
-        patronymic,
-        isAdmin,
-        region
-      FROM users
-      WHERE username = ?
-      LIMIT 1
-    `,
+            SELECT
+                id,
+                username,
+                password,
+                surname,
+                name,
+                patronymic,
+                isAdmin,
+                region
+            FROM users
+            WHERE username = ?
+                LIMIT 1
+        `,
         [username]
     );
 
@@ -56,8 +80,9 @@ export async function loginUser({ username, password, adminOnly = false }) {
         };
     }
 
-    // legacy-логика: сравнение с текущим форматом БД
-    if (String(user.password) !== String(password)) {
+    const passwordMatches = await verifyLegacyPassword(password, user.password);
+
+    if (!passwordMatches) {
         return {
             success: false,
             status: 401,

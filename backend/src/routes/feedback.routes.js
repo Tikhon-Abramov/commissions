@@ -41,6 +41,7 @@ feedbackRouter.get('/tickets/:ticketId/messages', async (req, res, next) => {
 feedbackRouter.post('/tickets', async (req, res, next) => {
     try {
         const { text } = req.body;
+
         const ticketId = await createTicket({
             currentUser: req.user,
             text,
@@ -80,6 +81,7 @@ feedbackRouter.patch('/tickets/:ticketId/status', async (req, res, next) => {
         await updateTicketStatus({
             ticketId: req.params.ticketId,
             status,
+            currentUser: req.user,
         });
 
         res.json({

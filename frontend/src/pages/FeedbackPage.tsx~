@@ -18,15 +18,11 @@ import {
     setFeedbackTickets,
     setFeedbackTicketsLoading,
     updateFeedbackDraft,
+    updateFeedbackTicketStatusLocal,
 } from '../features/feedback/feedbackSlice';
 import { feedbackStatuses } from '../features/feedback/mockData';
 import { apiRequest } from '../lib/api';
-import type {
-    FeedbackAttachment,
-    FeedbackMessage,
-    FeedbackTicket,
-    TicketStatus,
-} from '../types/feedback';
+import type { FeedbackAttachment, FeedbackMessage, FeedbackTicket, TicketStatus } from '../types/feedback';
 
 const statusLabels: Record<TicketStatus, string> = {
     new: 'Новый',
@@ -35,8 +31,7 @@ const statusLabels: Record<TicketStatus, string> = {
     closed: 'Закрыт',
 };
 
-const isFinalStatus = (status: TicketStatus) =>
-    status === 'resolved' || status === 'closed';
+const isFinalStatus = (status: TicketStatus) => status === 'resolved' || status === 'closed';
 
 const Root = styled.div`
   height: calc(100dvh - 168px);
@@ -50,7 +45,7 @@ const PageWrap = styled.div`
   min-height: 0;
   max-height: 100%;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   overflow: hidden;
 `;
@@ -76,13 +71,9 @@ const StatsRow = styled.div`
 const StatChip = styled.button<{ $active?: boolean }>`
   padding: 10px 14px;
   border-radius: 14px;
-  background: ${({ theme, $active }) =>
-    $active ? theme.colors.primarySoft : theme.colors.surface};
-  border: 1px solid
-    ${({ theme, $active }) =>
-    $active ? theme.colors.primary : theme.colors.border};
-  color: ${({ theme, $active }) =>
-    $active ? theme.colors.primary : theme.colors.text};
+  background: ${({ theme, $active }) => ($active ? theme.colors.primarySoft : theme.colors.surface)};
+  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.border)};
+  color: ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.text)};
   font-size: 13px;
   cursor: pointer;
   transition: 0.15s ease;
@@ -161,8 +152,7 @@ const TicketItem = styled.button<{ $active?: boolean }>`
   padding: 14px 16px;
   border: none;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme, $active }) =>
-    $active ? theme.colors.surfaceAlt : theme.colors.surface};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surfaceAlt : theme.colors.surface)};
   text-align: left;
   cursor: pointer;
   color: ${({ theme }) => theme.colors.text};
@@ -286,8 +276,7 @@ const MessageBubble = styled.div<{ $mine?: boolean }>`
   max-width: min(78%, 760px);
   padding: 12px 14px;
   border-radius: 16px;
-  background: ${({ theme, $mine }) =>
-    $mine ? theme.colors.primarySoft : theme.colors.surfaceAlt};
+  background: ${({ theme, $mine }) => ($mine ? theme.colors.primarySoft : theme.colors.surfaceAlt)};
   color: ${({ theme }) => theme.colors.text};
   justify-self: ${({ $mine }) => ($mine ? 'end' : 'start')};
   white-space: pre-wrap;
@@ -414,11 +403,8 @@ const Field = styled.label`
 const Dropzone = styled.label<{ $dragging?: boolean }>`
   min-height: 120px;
   border-radius: 14px;
-  border: 2px dashed
-    ${({ theme, $dragging }) =>
-    $dragging ? theme.colors.primary : theme.colors.border};
-  background: ${({ theme, $dragging }) =>
-    $dragging ? theme.colors.primarySoft : theme.colors.background};
+  border: 2px dashed ${({ theme, $dragging }) => ($dragging ? theme.colors.primary : theme.colors.border)};
+  background: ${({ theme, $dragging }) => ($dragging ? theme.colors.primarySoft : theme.colors.background)};
   color: ${({ theme }) => theme.colors.text};
   display: grid;
   place-items: center;
@@ -518,11 +504,7 @@ export function FeedbackPage() {
             const response = await apiRequest<TicketsResponse>('/feedback/tickets');
             dispatch(setFeedbackTickets(response.data));
         } catch (err) {
-            dispatch(
-                setFeedbackError(
-                    err instanceof Error ? err.message : 'Ошибка загрузки обращений',
-                ),
-            );
+            dispatch(setFeedbackError(err instanceof Error ? err.message : 'Ошибка загрузки обращений'));
         } finally {
             dispatch(setFeedbackTicketsLoading(false));
         }
@@ -533,16 +515,10 @@ export function FeedbackPage() {
         dispatch(setFeedbackError(''));
 
         try {
-            const response = await apiRequest<MessagesResponse>(
-                `/feedback/tickets/${ticketId}/messages`,
-            );
+            const response = await apiRequest<MessagesResponse>(`/feedback/tickets/${ticketId}/messages`);
             dispatch(setFeedbackMessages(response.data));
         } catch (err) {
-            dispatch(
-                setFeedbackError(
-                    err instanceof Error ? err.message : 'Ошибка загрузки сообщений',
-                ),
-            );
+            dispatch(setFeedbackError(err instanceof Error ? err.message : 'Ошибка загрузки сообщений'));
         } finally {
             dispatch(setFeedbackMessagesLoading(false));
         }
@@ -568,9 +544,7 @@ export function FeedbackPage() {
                 : tickets.filter((ticket) => ticket.status === statusFilter);
 
         return [...filtered].sort(
-            (a, b) =>
-                new Date(b.updatedAt || b.createdAt).getTime() -
-                new Date(a.updatedAt || a.createdAt).getTime(),
+            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
         );
     }, [statusFilter, tickets]);
 
@@ -581,8 +555,7 @@ export function FeedbackPage() {
 
     const selectedMessages = useMemo(() => {
         return [...messages].sort(
-            (a, b) =>
-                new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         );
     }, [messages]);
 
@@ -590,24 +563,21 @@ export function FeedbackPage() {
         return {
             total: tickets.length,
             new: tickets.filter((ticket) => ticket.status === 'new').length,
-            in_progress: tickets.filter((ticket) => ticket.status === 'in_progress')
-                .length,
+            in_progress: tickets.filter((ticket) => ticket.status === 'in_progress').length,
             resolved: tickets.filter((ticket) => ticket.status === 'resolved').length,
             closed: tickets.filter((ticket) => ticket.status === 'closed').length,
         };
     }, [tickets]);
 
     const unreadCount = useMemo(() => {
-        return tickets.reduce((acc, ticket) => {
-            const unread = isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser;
-            return acc + (Number(unread) > 0 ? 1 : 0);
-        }, 0);
+        return tickets.reduce(
+            (acc, ticket) => acc + (isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser),
+            0,
+        );
     }, [isAdmin, tickets]);
 
     const handleSendReply = async () => {
-        if (!selectedTicket || isFinalStatus(selectedTicket.status) || !replyText.trim()) {
-            return;
-        }
+        if (!selectedTicket || isFinalStatus(selectedTicket.status) || !replyText.trim()) return;
 
         dispatch(setFeedbackSubmitting(true));
         dispatch(setFeedbackError(''));
@@ -624,11 +594,7 @@ export function FeedbackPage() {
             await loadTickets();
             await loadMessages(selectedTicket.id);
         } catch (err) {
-            dispatch(
-                setFeedbackError(
-                    err instanceof Error ? err.message : 'Ошибка отправки сообщения',
-                ),
-            );
+            dispatch(setFeedbackError(err instanceof Error ? err.message : 'Ошибка отправки сообщения'));
         } finally {
             dispatch(setFeedbackSubmitting(false));
         }
@@ -653,11 +619,7 @@ export function FeedbackPage() {
             dispatch(selectFeedbackTicket(response.ticketId));
             await loadMessages(response.ticketId);
         } catch (err) {
-            dispatch(
-                setFeedbackError(
-                    err instanceof Error ? err.message : 'Ошибка создания обращения',
-                ),
-            );
+            dispatch(setFeedbackError(err instanceof Error ? err.message : 'Ошибка создания обращения'));
         } finally {
             dispatch(setFeedbackSubmitting(false));
         }
@@ -677,13 +639,16 @@ export function FeedbackPage() {
                 },
             });
 
+            dispatch(
+                updateFeedbackTicketStatusLocal({
+                    ticketId: selectedTicket.id,
+                    status,
+                }),
+            );
+
             await loadTickets();
         } catch (err) {
-            dispatch(
-                setFeedbackError(
-                    err instanceof Error ? err.message : 'Ошибка обновления статуса',
-                ),
-            );
+            dispatch(setFeedbackError(err instanceof Error ? err.message : 'Ошибка обновления статуса'));
         } finally {
             dispatch(setFeedbackSubmitting(false));
         }
@@ -704,9 +669,7 @@ export function FeedbackPage() {
                 <HeaderBlock>
                     <PageHeader
                         title="Обратная связь"
-                        description={`Обращения и переписка с поддержкой.${
-                            unreadCount ? ` Непрочитано: ${unreadCount}.` : ''
-                        }`}
+                        description={`Обращения и переписка с поддержкой.${unreadCount ? ` Непрочитано: ${unreadCount}.` : ''}`}
                     />
                 </HeaderBlock>
 
@@ -753,9 +716,7 @@ export function FeedbackPage() {
                         <Select
                             value={statusFilter}
                             onChange={(e) =>
-                                dispatch(
-                                    setFeedbackStatusFilter(e.target.value as 'all' | TicketStatus),
-                                )
+                                dispatch(setFeedbackStatusFilter(e.target.value as 'all' | TicketStatus))
                             }
                         >
                             <option value="all">Все статусы</option>
@@ -767,10 +728,7 @@ export function FeedbackPage() {
                         </Select>
 
                         {!isAdmin ? (
-                            <PrimaryButton
-                                type="button"
-                                onClick={() => dispatch(openCreateFeedbackModal())}
-                            >
+                            <PrimaryButton type="button" onClick={() => dispatch(openCreateFeedbackModal())}>
                                 Новое обращение
                             </PrimaryButton>
                         ) : null}
@@ -788,9 +746,7 @@ export function FeedbackPage() {
                         ) : (
                             <TicketList>
                                 {visibleTickets.map((ticket) => {
-                                    const unread = isAdmin
-                                        ? ticket.unreadForAdmin
-                                        : ticket.unreadForUser;
+                                    const unread = isAdmin ? ticket.unreadForAdmin : ticket.unreadForUser;
 
                                     return (
                                         <TicketItem
@@ -806,16 +762,14 @@ export function FeedbackPage() {
                                             </TicketTop>
 
                                             <TicketMeta>
-                                                {ticket.regionName ||
-                                                    ticket.authorFullName ||
-                                                    currentRegionName}
+                                                {ticket.regionName || ticket.authorFullName || currentRegionName}
                                                 <br />
-                                                {formatDateTime(ticket.updatedAt || ticket.createdAt)}
+                                                {formatDateTime(ticket.updatedAt)}
                                             </TicketMeta>
 
-                                            {Number(unread) > 0 ? (
+                                            {unread > 0 ? (
                                                 <div style={{ marginTop: 8 }}>
-                                                    <UnreadDot>{Number(unread)}</UnreadDot>
+                                                    <UnreadDot>{unread}</UnreadDot>
                                                 </div>
                                             ) : null}
                                         </TicketItem>
@@ -834,10 +788,8 @@ export function FeedbackPage() {
                                     <div>
                                         <ChatTitle>{selectedTicket.subject}</ChatTitle>
                                         <ChatSubtitle>
-                                            {selectedTicket.regionName ||
-                                                selectedTicket.authorFullName ||
-                                                currentRegionName}{' '}
-                                            · {statusLabels[selectedTicket.status]}
+                                            {selectedTicket.regionName || selectedTicket.authorFullName || currentRegionName} ·{' '}
+                                            {statusLabels[selectedTicket.status]}
                                         </ChatSubtitle>
                                     </div>
 
@@ -854,8 +806,7 @@ export function FeedbackPage() {
                                                     </SecondaryButton>
                                                 ) : null}
 
-                                                {selectedTicket.status === 'new' ||
-                                                selectedTicket.status === 'in_progress' ? (
+                                                {selectedTicket.status === 'new' || selectedTicket.status === 'in_progress' ? (
                                                     <>
                                                         <SecondaryButton
                                                             type="button"
@@ -920,9 +871,7 @@ export function FeedbackPage() {
                                                             📎 Скачать: {message.attachment.name}
                                                         </MessageAttachment>
                                                     ) : null}
-                                                    <MessageTime>
-                                                        {formatDateTime(message.createdAt)}
-                                                    </MessageTime>
+                                                    <MessageTime>{formatDateTime(message.createdAt)}</MessageTime>
                                                 </MessageBubble>
                                             );
                                         })
@@ -932,17 +881,13 @@ export function FeedbackPage() {
                                 <ReplyBox>
                                     <Textarea
                                         value={replyText}
-                                        onChange={(e) =>
-                                            dispatch(setFeedbackReplyText(e.target.value))
-                                        }
+                                        onChange={(e) => dispatch(setFeedbackReplyText(e.target.value))}
                                         placeholder={
                                             isFinalStatus(selectedTicket.status)
                                                 ? 'Обращение завершено. Отправка сообщений недоступна.'
                                                 : 'Введите сообщение...'
                                         }
-                                        disabled={
-                                            isFinalStatus(selectedTicket.status) || isSubmitting
-                                        }
+                                        disabled={isFinalStatus(selectedTicket.status) || isSubmitting}
                                     />
 
                                     <ReplyActions>
@@ -950,9 +895,7 @@ export function FeedbackPage() {
                                         <PrimaryButton
                                             type="button"
                                             onClick={handleSendReply}
-                                            disabled={
-                                                isFinalStatus(selectedTicket.status) || isSubmitting
-                                            }
+                                            disabled={isFinalStatus(selectedTicket.status) || isSubmitting}
                                         >
                                             {isSubmitting ? 'Отправка...' : 'Отправить'}
                                         </PrimaryButton>
@@ -987,9 +930,7 @@ export function FeedbackPage() {
                                         <div>
                                             <div>Перетащите файл сюда или нажмите для выбора</div>
                                             {draftTemplate.attachment ? (
-                                                <AttachmentMeta>
-                                                    📎 {draftTemplate.attachment.name}
-                                                </AttachmentMeta>
+                                                <AttachmentMeta>📎 {draftTemplate.attachment.name}</AttachmentMeta>
                                             ) : (
                                                 <AttachmentMeta>Вложение необязательно</AttachmentMeta>
                                             )}
@@ -997,9 +938,7 @@ export function FeedbackPage() {
 
                                         <HiddenInput
                                             type="file"
-                                            onChange={(e) =>
-                                                applyFile(e.target.files?.[0] ?? null)
-                                            }
+                                            onChange={(e) => applyFile(e.target.files?.[0] ?? null)}
                                         />
                                     </Dropzone>
                                 </Field>
@@ -1008,25 +947,16 @@ export function FeedbackPage() {
                                     Текст обращения
                                     <Textarea
                                         value={draftTemplate.text}
-                                        onChange={(e) =>
-                                            dispatch(updateFeedbackDraft({ text: e.target.value }))
-                                        }
+                                        onChange={(e) => dispatch(updateFeedbackDraft({ text: e.target.value }))}
                                     />
                                 </Field>
                             </ModalBody>
 
                             <ModalFooter>
-                                <SecondaryButton
-                                    type="button"
-                                    onClick={() => dispatch(closeCreateFeedbackModal())}
-                                >
+                                <SecondaryButton type="button" onClick={() => dispatch(closeCreateFeedbackModal())}>
                                     Отмена
                                 </SecondaryButton>
-                                <PrimaryButton
-                                    type="button"
-                                    onClick={handleCreateTicket}
-                                    disabled={isSubmitting}
-                                >
+                                <PrimaryButton type="button" onClick={handleCreateTicket} disabled={isSubmitting}>
                                     {isSubmitting ? 'Отправка...' : 'Отправить обращение'}
                                 </PrimaryButton>
                             </ModalFooter>

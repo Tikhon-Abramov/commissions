@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { setCredentials } from '../features/auth/authSlice';
+import { apiRequest } from '../lib/api';
 
 const Page = styled.div`
   min-height: 100vh;
@@ -96,6 +97,11 @@ const PrimaryButton = styled.button`
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `;
 
 const SecondaryButton = styled.button`
@@ -109,72 +115,104 @@ const SecondaryButton = styled.button`
   cursor: pointer;
 `;
 
-const regionLabel = (value: string) => {
-    if (value === '77') return '77 — Москва';
-    if (value === '78') return '78 — Санкт-Петербург';
-    if (value === '50') return '50 — Московская область';
-    return 'Регион';
+type ServiceModeResponse = {
+    success: true;
+    data: {
+        enabled: boolean;
+        message: string;
+    };
+};
+
+type LoginResponse = {
+    success: true;
+    token: string;
+    user: {
+        id: number;
+        username: string;
+        fullName: string;
+        isAdmin: boolean;
+        role: 'admin' | 'user';
+        region: string | null;
+    };
 };
 
 export function LoginPage() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-
     const { userKey } = useAppSelector((state) => state.auth);
-    const { users, serviceMode } = useAppSelector((state) => state.admin);
 
-    const [login, setLogin] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [adminOnlyAttempt, setAdminOnlyAttempt] = useState(serviceMode.enabled);
+    const [adminOnlyAttempt, setAdminOnlyAttempt] = useState(false);
+    const [serviceMode, setServiceMode] = useState<{ enabled: boolean; message: string }>({
+        enabled: false,
+        message: '',
+    });
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [bootLoading, setBootLoading] = useState(true);
 
     const redirectTo = useMemo(() => {
         const fromState = location.state as { from?: string } | null;
         return fromState?.from || '/commissions';
     }, [location.state]);
 
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const response = await apiRequest<ServiceModeResponse>('/auth/service-mode');
+                setServiceMode(response.data);
+                setAdminOnlyAttempt(response.data.enabled);
+            } catch {
+                setServiceMode({
+                    enabled: false,
+                    message: '',
+                });
+            } finally {
+                setBootLoading(false);
+            }
+        };
+
+        load();
+    }, []);
+
     if (userKey) {
         return <Navigate to={redirectTo} replace />;
     }
 
-    const handleSubmit = (event: React.FormEvent) => {
+    const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        setError('');
+        setLoading(true);
 
-        const foundUser = users.find(
-            (user) =>
-                user.login === login.trim() &&
-                user.password === password &&
-                user.isActive,
-        );
+        try {
+            const response = await apiRequest<LoginResponse>('/auth/login', {
+                method: 'POST',
+                json: {
+                    username,
+                    password,
+                    adminOnly: adminOnlyAttempt,
+                },
+            });
 
-        if (!foundUser) {
-            setError('Неверный логин или пароль, либо аккаунт деактивирован.');
-            return;
+            dispatch(
+                setCredentials({
+                    userKey: response.token,
+                    username: response.user.username,
+                    fullName: response.user.fullName,
+                    isAdmin: response.user.isAdmin,
+                    role: response.user.role,
+                    region: response.user.region,
+                }),
+            );
+
+            navigate(response.user.isAdmin ? '/admin' : redirectTo, { replace: true });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ошибка входа');
+        } finally {
+            setLoading(false);
         }
-
-        if (serviceMode.enabled && foundUser.role !== 'admin') {
-            setError('Сервис временно недоступен для пользователей. Войти может только администратор.');
-            return;
-        }
-
-        if (adminOnlyAttempt && foundUser.role !== 'admin') {
-            setError('В режиме доступа администратора войти может только администратор.');
-            return;
-        }
-
-        dispatch(
-            setCredentials({
-                userKey: `session-${foundUser.id}-${Date.now()}`,
-                username: foundUser.login,
-                fullName: `${foundUser.lastName} ${foundUser.firstName} ${foundUser.middleName}`.trim(),
-                isAdmin: foundUser.role === 'admin',
-                role: foundUser.role,
-                region: foundUser.role === 'admin' ? null : foundUser.region,
-            }),
-        );
-
-        navigate(foundUser.role === 'admin' ? '/admin' : redirectTo, { replace: true });
     };
 
     return (
@@ -182,9 +220,7 @@ export function LoginPage() {
             <Card>
                 <Header>
                     <Title>Вход в сервис</Title>
-                    <Description>
-                        Авторизуйтесь, чтобы продолжить работу в системе.
-                    </Description>
+                    <Description>Авторизуйтесь, чтобы продолжить работу в системе.</Description>
                 </Header>
 
                 {serviceMode.enabled ? (
@@ -198,7 +234,11 @@ export function LoginPage() {
                 <Form onSubmit={handleSubmit}>
                     <Field>
                         Логин
-                        <Input value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Введите логин" />
+                        <Input
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Введите логин"
+                        />
                     </Field>
 
                     <Field>
@@ -214,8 +254,8 @@ export function LoginPage() {
                     {error ? <ErrorText>{error}</ErrorText> : null}
 
                     <Actions>
-                        <PrimaryButton type="submit">
-                            Войти
+                        <PrimaryButton type="submit" disabled={loading || bootLoading}>
+                            {loading ? 'Вход...' : 'Войти'}
                         </PrimaryButton>
 
                         {serviceMode.enabled ? (
@@ -225,17 +265,12 @@ export function LoginPage() {
                                     setAdminOnlyAttempt(true);
                                     setError('');
                                 }}
+                                disabled={loading || bootLoading}
                             >
                                 Вход для администратора
                             </SecondaryButton>
                         ) : null}
                     </Actions>
-
-                    {!serviceMode.enabled ? (
-                        <Description>
-                            Тестовые аккаунты пользователей привязаны к регионам: {regionLabel('77')}, {regionLabel('78')}, {regionLabel('50')}.
-                        </Description>
-                    ) : null}
                 </Form>
             </Card>
         </Page>
