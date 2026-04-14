@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import {
-    getCommissionsList,
     getCommissionsMeta,
+    getCommissionsPage,
+    getCommissionsSummary,
 } from '../services/commissions.service.js';
 
 export const commissionsRouter = Router();
@@ -25,17 +26,47 @@ commissionsRouter.get('/meta', async (req, res, next) => {
     }
 });
 
+commissionsRouter.get('/summary', async (req, res, next) => {
+    try {
+        const { region = '', quarter = '', search = '' } = req.query;
+
+        const data = await getCommissionsSummary({
+            region: String(region),
+            quarter: String(quarter),
+            search: String(search),
+            isAdmin: Boolean(req.user?.isAdmin),
+            userRegion: req.user?.region || '',
+        });
+
+        res.json({
+            success: true,
+            data,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 commissionsRouter.get('/', async (req, res, next) => {
     try {
-        const { region = '', quarter = '', status = '', search = '' } = req.query;
+        const {
+            region = '',
+            quarter = '',
+            status = '',
+            search = '',
+            offset = '0',
+            limit = '50',
+        } = req.query;
 
-        const data = await getCommissionsList({
+        const data = await getCommissionsPage({
             region: String(region),
             quarter: String(quarter),
             status: String(status),
             search: String(search),
             isAdmin: Boolean(req.user?.isAdmin),
             userRegion: req.user?.region || '',
+            offset: Number(offset || 0),
+            limit: Math.min(Number(limit || 50), 100),
         });
 
         res.json({

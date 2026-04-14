@@ -40,50 +40,50 @@ function formatQuarterLabel(quarterNumber, year) {
 }
 
 async function resolveSchema() {
-    const metaInnCol = await pickColumn('meta', ['inn', 'INN']);
-    const metaNameCol = await pickColumn('meta', ['name', 'title', 'fullname']);
-    const metaRegionCol = await pickColumn('meta', ['region', 'subject', 'ufns'], {
+    const metaInnCol = await pickColumn('meta', ['inn']);
+    const metaNameCol = await pickColumn('meta', ['name']);
+    const metaRegionCol = await pickColumn('meta', ['region'], {
         required: false,
     });
     const metaKnoCol = await pickColumn('meta', ['kno'], { required: false });
 
-    const saldoInnCol = await pickColumn('saldo', ['inn', 'INN']);
-    const saldoAmountCol = await pickColumn('saldo', [
-        'saldo',
-    ]);
-    const saldoDateCol = await pickColumn('saldo', [
-        'sum_date',
-    ]);
-    const saldoPeriodCol = await pickColumn('saldo', ['period', 'period_id'], {
+    const saldoInnCol = await pickColumn('saldo', ['inn']);
+    const saldoAmountCol = await pickColumn('saldo', ['saldo']);
+    const saldoDateCol = await pickColumn('saldo', ['sum_date']);
+    const saldoPeriodCol = await pickColumn('saldo', ['period'], {
         required: false,
     });
 
     const periodsIdCol = await pickColumn('periods', ['id']);
-    const periodsQuarterCol = await pickColumn('periods', ['quartal', 'quarter']);
+    const periodsQuarterCol = await pickColumn('periods', ['quartal']);
     const periodsYearCol = await pickColumn('periods', ['year']);
     const periodsActiveCol = await pickColumn('periods', ['is_active', 'active'], {
         required: false,
     });
 
-    const commissionsInnCol = await pickColumn('commissions', ['inn', 'INN']);
-    const commissionsStatusCol = await pickColumn('commissions', ['status'], {
+    const commissionsInnCol = await pickColumn('commissions', ['inn']);
+    const commissionsStatusCol = await pickColumn('commissions', ['com_events'], {
         required: false,
     });
-    const commissionsResultCol = await pickColumn('commissions', ['result'], {
+    const commissionsResultCol = await pickColumn('commissions', ['com_events'], {
         required: false,
     });
-    const commissionsDateCol = await pickColumn('commissions', ['date', 'created_at'], {
+    const commissionsDateCol = await pickColumn('commissions', ['com_date'], {
         required: false,
     });
 
-    const eventsInnCol = await pickColumn('events', ['inn', 'INN']);
+    const eventsInnCol = await pickColumn('events', ['inn']);
     const eventsStatusCol = await pickColumn('events', ['status'], { required: false });
     const eventsResultCol = await pickColumn('events', ['result'], { required: false });
-    const eventsDateCol = await pickColumn('events', ['date', 'created_at'], { required: false });
+    const eventsDateCol = await pickColumn('events', ['date', 'created_at'], {
+        required: false,
+    });
 
-    const filesInnCol = await pickColumn('files', ['inn', 'INN']);
+    const filesInnCol = await pickColumn('files', ['inn']);
     const filesNameCol = await pickColumn('files', ['original_filename']);
-    const filesDateCol = await pickColumn('files', ['date', 'created_at'], { required: false });
+    const filesDateCol = await pickColumn('files', ['uploaded_at'], {
+        required: false,
+    });
 
     const employeesInnCol = await pickColumn('employees', ['emp_inn']);
     const employeesDebtCol = await pickColumn('employees', ['emp_saldo'], {
@@ -122,9 +122,33 @@ async function resolveSchema() {
 function getCurrentQuarterFallback() {
     const now = new Date();
     const quarter = Math.floor(now.getMonth() / 3) + 1;
+
     return {
         value: `${now.getFullYear()}-Q${quarter}`,
         label: formatQuarterLabel(quarter, now.getFullYear()),
+    };
+}
+
+function buildMetaWhere({ schema, region, search, isAdmin, userRegion }) {
+    const effectiveRegion = isAdmin ? region || '' : userRegion || '';
+    const trimmedSearch = String(search || '').trim();
+
+    const where = [];
+    const params = [];
+
+    if (schema.metaRegionCol && effectiveRegion) {
+        where.push(`m.${schema.metaRegionCol} = ?`);
+        params.push(effectiveRegion);
+    }
+
+    if (trimmedSearch) {
+        where.push(`(m.${schema.metaInnCol} LIKE ? OR m.${schema.metaNameCol} LIKE ?)`);
+        params.push(`%${trimmedSearch}%`, `%${trimmedSearch}%`);
+    }
+
+    return {
+        whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+        params,
     };
 }
 
@@ -133,14 +157,14 @@ export async function getCommissionsMeta({ isAdmin, userRegion }) {
 
     const [periodRows] = await pool.query(
         `
-      SELECT
-        ${schema.periodsIdCol} AS id,
-        ${schema.periodsQuarterCol} AS quartal,
-        ${schema.periodsYearCol} AS year
-        ${schema.periodsActiveCol ? `, ${schema.periodsActiveCol} AS is_active` : ''}
-      FROM periods
-      ORDER BY ${schema.periodsYearCol} DESC, ${schema.periodsQuarterCol} DESC
-    `
+            SELECT
+                ${schema.periodsIdCol} AS id,
+                ${schema.periodsQuarterCol} AS quartal,
+                ${schema.periodsYearCol} AS year
+                        ${schema.periodsActiveCol ? `, ${schema.periodsActiveCol} AS is_active` : ''}
+            FROM periods
+            ORDER BY ${schema.periodsYearCol} DESC, ${schema.periodsQuarterCol} DESC
+        `
     );
 
     const quarters = periodRows.length
@@ -154,12 +178,12 @@ export async function getCommissionsMeta({ isAdmin, userRegion }) {
     const [regionRows] = schema.metaRegionCol
         ? await pool.query(
             `
-          SELECT DISTINCT ${schema.metaRegionCol} AS region
-          FROM meta
-          WHERE ${schema.metaRegionCol} IS NOT NULL
-            AND ${schema.metaRegionCol} <> ''
-          ORDER BY ${schema.metaRegionCol} ASC
-        `
+                SELECT DISTINCT ${schema.metaRegionCol} AS region
+                FROM meta
+                WHERE ${schema.metaRegionCol} IS NOT NULL
+                  AND ${schema.metaRegionCol} <> ''
+                ORDER BY ${schema.metaRegionCol} ASC
+            `
         )
         : [[]];
 
@@ -185,48 +209,302 @@ export async function getCommissionsMeta({ isAdmin, userRegion }) {
     };
 }
 
-export async function getCommissionsList({
+async function getBaseFilteredRows({
+                                       schema,
+                                       region,
+                                       quarter,
+                                       search,
+                                       isAdmin,
+                                       userRegion,
+                                       offset,
+                                       limit,
+                                   }) {
+    const { whereSql, params } = buildMetaWhere({
+        schema,
+        region,
+        search,
+        isAdmin,
+        userRegion,
+    });
+
+    const latestSaldoJoin = schema.saldoPeriodCol && quarter
+        ? `
+    LEFT JOIN (
+      SELECT y.inn, y.latest_amount
+      FROM (
+        SELECT
+          s.${schema.saldoInnCol} AS inn,
+          CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS latest_amount,
+          ROW_NUMBER() OVER (
+            PARTITION BY s.${schema.saldoInnCol}
+            ORDER BY s.${schema.saldoDateCol} DESC
+          ) AS rn
+        FROM saldo s
+        WHERE s.${schema.saldoPeriodCol} = ?
+      ) y
+      WHERE y.rn = 1
+    ) ls ON ls.inn = m.${schema.metaInnCol}
+  `
+        : `
+    LEFT JOIN (
+      SELECT y.inn, y.latest_amount
+      FROM (
+        SELECT
+          s.${schema.saldoInnCol} AS inn,
+          CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS latest_amount,
+          ROW_NUMBER() OVER (
+            PARTITION BY s.${schema.saldoInnCol}
+            ORDER BY s.${schema.saldoDateCol} DESC
+          ) AS rn
+        FROM saldo s
+      ) y
+      WHERE y.rn = 1
+    ) ls ON ls.inn = m.${schema.metaInnCol}
+  `;
+
+    const countParams = schema.saldoPeriodCol && quarter ? [quarter, ...params] : params;
+
+    const [countRows] = await pool.query(
+        `
+      SELECT COUNT(*) AS total
+      FROM meta m
+      ${latestSaldoJoin}
+      ${whereSql}
+    `,
+        countParams
+    );
+
+    const listParams = schema.saldoPeriodCol && quarter
+        ? [quarter, ...params, limit, offset]
+        : [...params, limit, offset];
+
+    const [rows] = await pool.query(
+        `
+      SELECT
+        m.${schema.metaInnCol} AS inn,
+        m.${schema.metaNameCol} AS name
+        ${schema.metaRegionCol ? `, m.${schema.metaRegionCol} AS region` : `, '' AS region`}
+        ${schema.metaKnoCol ? `, m.${schema.metaKnoCol} AS kno` : `, '' AS kno`},
+        COALESCE(ls.latest_amount, -1) AS latest_amount_for_sort
+      FROM meta m
+      ${latestSaldoJoin}
+      ${whereSql}
+      ORDER BY latest_amount_for_sort DESC, m.${schema.metaNameCol} ASC
+      LIMIT ? OFFSET ?
+    `,
+        listParams
+    );
+
+    return {
+        total: Number(countRows[0]?.total || 0),
+        rows,
+    };
+}
+
+async function getFilteredInns({
+                                   schema,
+                                   region,
+                                   search,
+                                   isAdmin,
+                                   userRegion,
+                               }) {
+    const { whereSql, params } = buildMetaWhere({
+        schema,
+        region,
+        search,
+        isAdmin,
+        userRegion,
+    });
+
+    const [rows] = await pool.query(
+        `
+            SELECT m.${schema.metaInnCol} AS inn
+            FROM meta m
+                ${whereSql}
+        `,
+        params
+    );
+
+    return rows.map((row) => row.inn);
+}
+
+export async function getCommissionsSummary({
+                                                region,
+                                                quarter,
+                                                search,
+                                                isAdmin,
+                                                userRegion,
+                                            }) {
+    const schema = await resolveSchema();
+
+    const inns = await getFilteredInns({
+        schema,
+        region,
+        search,
+        isAdmin,
+        userRegion,
+    });
+
+    if (!inns.length) {
+        return {
+            taxpayersCount: 0,
+            ensDebt: 0,
+            commissionsDone: 0,
+            employeeDebtorsCount: 0,
+            employeeDebtAmount: 0,
+        };
+    }
+
+    const innPlaceholders = inns.map(() => '?').join(',');
+
+    const saldoParams = [...inns];
+    let latestSaldoSql = `
+        SELECT
+            x.inn,
+            x.amount
+        FROM (
+                 SELECT
+                     s.${schema.saldoInnCol} AS inn,
+                     CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS amount,
+                     ROW_NUMBER() OVER (
+          PARTITION BY s.${schema.saldoInnCol}
+          ORDER BY s.${schema.saldoDateCol} DESC
+        ) AS rn
+                 FROM saldo s
+                 WHERE s.${schema.saldoInnCol} IN (${innPlaceholders})
+    `;
+
+    if (schema.saldoPeriodCol && quarter) {
+        latestSaldoSql += ` AND s.${schema.saldoPeriodCol} = ?`;
+        saldoParams.push(quarter);
+    }
+
+    latestSaldoSql += `
+    ) x
+    WHERE x.rn = 1
+  `;
+
+    const [latestSaldoRows] = await pool.query(latestSaldoSql, saldoParams);
+
+    const [commissionRows] = await pool.query(
+        `
+            SELECT
+                c.${schema.commissionsInnCol} AS inn
+                ${schema.commissionsStatusCol ? `, c.${schema.commissionsStatusCol} AS commission_status` : `, '' AS commission_status`}
+            FROM commissions c
+            WHERE c.${schema.commissionsInnCol} IN (${innPlaceholders})
+                ${schema.commissionsDateCol ? `ORDER BY c.${schema.commissionsDateCol} DESC` : ''}
+        `,
+        inns
+    );
+
+    const [eventRows] = await pool.query(
+        `
+            SELECT
+                e.${schema.eventsInnCol} AS inn
+                ${schema.eventsStatusCol ? `, e.${schema.eventsStatusCol} AS event_status` : `, '' AS event_status`}
+            FROM events e
+            WHERE e.${schema.eventsInnCol} IN (${innPlaceholders})
+                ${schema.eventsDateCol ? `ORDER BY e.${schema.eventsDateCol} DESC` : ''}
+        `,
+        inns
+    );
+
+    const employeeRows = schema.employeesDebtCol
+        ? (
+            await pool.query(
+                `
+                    SELECT
+                        e.${schema.employeesInnCol} AS inn,
+                        COUNT(*) AS employee_debtors_count,
+                        COALESCE(SUM(CAST(e.${schema.employeesDebtCol} AS DECIMAL(18,2))), 0) AS employee_debt_amount
+                    FROM employees e
+                    WHERE e.${schema.employeesInnCol} IN (${innPlaceholders})
+                    GROUP BY e.${schema.employeesInnCol}
+                `,
+                inns
+            )
+        )[0]
+        : [];
+
+    const latestCommissionByInn = new Map();
+    for (const row of commissionRows) {
+        if (!latestCommissionByInn.has(row.inn)) {
+            latestCommissionByInn.set(row.inn, row);
+        }
+    }
+
+    const latestEventByInn = new Map();
+    for (const row of eventRows) {
+        if (!latestEventByInn.has(row.inn)) {
+            latestEventByInn.set(row.inn, row);
+        }
+    }
+
+    const ensDebt = latestSaldoRows.reduce(
+        (acc, row) => acc + Number(row.amount || 0),
+        0,
+    );
+
+    const commissionsDone = inns.reduce((acc, inn) => {
+        const commission = latestCommissionByInn.get(inn);
+        const event = latestEventByInn.get(inn);
+        const status = mapCommissionStatus(
+            commission?.commission_status,
+            event?.event_status,
+        );
+        return acc + (status === 'Комиссия проведена' ? 1 : 0);
+    }, 0);
+
+    const employeeDebtorsCount = employeeRows.reduce(
+        (acc, row) => acc + Number(row.employee_debtors_count || 0),
+        0,
+    );
+
+    const employeeDebtAmount = employeeRows.reduce(
+        (acc, row) => acc + Number(row.employee_debt_amount || 0),
+        0,
+    );
+
+    return {
+        taxpayersCount: inns.length,
+        ensDebt,
+        commissionsDone,
+        employeeDebtorsCount,
+        employeeDebtAmount,
+    };
+}
+
+export async function getCommissionsPage({
                                              region,
                                              quarter,
                                              status,
                                              search,
                                              isAdmin,
                                              userRegion,
+                                             offset,
+                                             limit,
                                          }) {
     const schema = await resolveSchema();
 
-    const effectiveRegion = isAdmin ? region || '' : userRegion || '';
-    const trimmedSearch = String(search || '').trim();
-
-    const where = [];
-    const params = [];
-
-    if (schema.metaRegionCol && effectiveRegion) {
-        where.push(`m.${schema.metaRegionCol} = ?`);
-        params.push(effectiveRegion);
-    }
-
-    if (trimmedSearch) {
-        where.push(`(m.${schema.metaInnCol} LIKE ? OR m.${schema.metaNameCol} LIKE ?)`);
-        params.push(`%${trimmedSearch}%`, `%${trimmedSearch}%`);
-    }
-
-    const [baseRows] = await pool.query(
-        `
-      SELECT
-        m.${schema.metaInnCol} AS inn,
-        m.${schema.metaNameCol} AS name
-        ${schema.metaRegionCol ? `, m.${schema.metaRegionCol} AS region` : `, '' AS region`}
-        ${schema.metaKnoCol ? `, m.${schema.metaKnoCol} AS kno` : `, '' AS kno`}
-      FROM meta m
-      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY m.${schema.metaNameCol} ASC
-    `,
-        params
-    );
+    const { total, rows: baseRows } = await getBaseFilteredRows({
+        schema,
+        region,
+        quarter,
+        search,
+        isAdmin,
+        userRegion,
+        offset,
+        limit,
+    });
 
     if (!baseRows.length) {
-        return [];
+        return {
+            items: [],
+            total,
+            hasMore: false,
+            nextOffset: offset,
+        };
     }
 
     const inns = baseRows.map((row) => row.inn);
@@ -234,13 +512,13 @@ export async function getCommissionsList({
 
     const saldoParams = [...inns];
     let saldoSql = `
-    SELECT
-      s.${schema.saldoInnCol} AS inn,
-      DATE(s.${schema.saldoDateCol}) AS balance_date,
-      CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS total_sum
-    FROM saldo s
-    WHERE s.${schema.saldoInnCol} IN (${innPlaceholders})
-  `;
+        SELECT
+            s.${schema.saldoInnCol} AS inn,
+            DATE(s.${schema.saldoDateCol}) AS balance_date,
+            CAST(s.${schema.saldoAmountCol} AS DECIMAL(18,2)) AS total_sum
+        FROM saldo s
+        WHERE s.${schema.saldoInnCol} IN (${innPlaceholders})
+    `;
 
     if (schema.saldoPeriodCol && quarter) {
         saldoSql += ` AND s.${schema.saldoPeriodCol} = ?`;
@@ -253,74 +531,44 @@ export async function getCommissionsList({
 
     const [commissionRows] = await pool.query(
         `
-      SELECT
-        c.${schema.commissionsInnCol} AS inn
-        ${schema.commissionsStatusCol ? `, c.${schema.commissionsStatusCol} AS commission_status` : `, '' AS commission_status`}
+            SELECT
+                c.${schema.commissionsInnCol} AS inn
+                ${schema.commissionsStatusCol ? `, c.${schema.commissionsStatusCol} AS commission_status` : `, '' AS commission_status`}
         ${schema.commissionsResultCol ? `, c.${schema.commissionsResultCol} AS interaction_status` : `, '' AS interaction_status`}
         ${schema.commissionsDateCol ? `, c.${schema.commissionsDateCol} AS commission_date` : `, NULL AS commission_date`}
-      FROM commissions c
-      WHERE c.${schema.commissionsInnCol} IN (${innPlaceholders})
-      ${schema.commissionsDateCol ? `ORDER BY c.${schema.commissionsDateCol} DESC` : ''}
-    `,
+            FROM commissions c
+            WHERE c.${schema.commissionsInnCol} IN (${innPlaceholders})
+                ${schema.commissionsDateCol ? `ORDER BY c.${schema.commissionsDateCol} DESC` : ''}
+        `,
         inns
     );
 
     const [eventRows] = await pool.query(
         `
-      SELECT
-        e.${schema.eventsInnCol} AS inn
-        ${schema.eventsStatusCol ? `, e.${schema.eventsStatusCol} AS event_status` : `, '' AS event_status`}
+            SELECT
+                e.${schema.eventsInnCol} AS inn
+                ${schema.eventsStatusCol ? `, e.${schema.eventsStatusCol} AS event_status` : `, '' AS event_status`}
         ${schema.eventsResultCol ? `, e.${schema.eventsResultCol} AS event_result` : `, '' AS event_result`}
         ${schema.eventsDateCol ? `, e.${schema.eventsDateCol} AS event_date` : `, NULL AS event_date`}
-      FROM events e
-      WHERE e.${schema.eventsInnCol} IN (${innPlaceholders})
-      ${schema.eventsDateCol ? `ORDER BY e.${schema.eventsDateCol} DESC` : ''}
-    `,
+            FROM events e
+            WHERE e.${schema.eventsInnCol} IN (${innPlaceholders})
+                ${schema.eventsDateCol ? `ORDER BY e.${schema.eventsDateCol} DESC` : ''}
+        `,
         inns
     );
 
     const [fileRows] = await pool.query(
         `
-      SELECT
-        f.${schema.filesInnCol} AS inn,
-        f.${schema.filesNameCol} AS file_name
-        ${schema.filesDateCol ? `, f.${schema.filesDateCol} AS file_date` : `, NULL AS file_date`}
-      FROM files f
-      WHERE f.${schema.filesInnCol} IN (${innPlaceholders})
-      ${schema.filesDateCol ? `ORDER BY f.${schema.filesDateCol} DESC, f.id DESC` : `ORDER BY f.id DESC`}
-    `,
+            SELECT
+                f.${schema.filesInnCol} AS inn,
+                f.${schema.filesNameCol} AS file_name
+                ${schema.filesDateCol ? `, f.${schema.filesDateCol} AS file_date` : `, NULL AS file_date`}
+            FROM files f
+            WHERE f.${schema.filesInnCol} IN (${innPlaceholders})
+                ${schema.filesDateCol ? `ORDER BY f.${schema.filesDateCol} DESC, f.id DESC` : `ORDER BY f.id DESC`}
+        `,
         inns
     );
-
-    const employeeRows = schema.employeesDebtCol
-        ? (
-            await pool.query(
-                `
-            SELECT
-              e.${schema.employeesInnCol} AS inn,
-              COUNT(*) AS employee_debtors_count,
-              COALESCE(SUM(CAST(e.${schema.employeesDebtCol} AS DECIMAL(18,2))), 0) AS employee_debt_amount
-            FROM employees e
-            WHERE e.${schema.employeesInnCol} IN (${innPlaceholders})
-            GROUP BY e.${schema.employeesInnCol}
-          `,
-                inns
-            )
-        )[0]
-        : [];
-
-    const balancesByInn = new Map();
-    for (const row of balanceRows) {
-        const current = balancesByInn.get(row.inn) || [];
-        current.push({
-            date:
-                row.balance_date instanceof Date
-                    ? row.balance_date.toISOString().slice(0, 10)
-                    : String(row.balance_date).slice(0, 10),
-            amount: Number(row.total_sum || 0),
-        });
-        balancesByInn.set(row.inn, current);
-    }
 
     const latestCommissionByInn = new Map();
     for (const row of commissionRows) {
@@ -343,31 +591,17 @@ export async function getCommissionsList({
         }
     }
 
-    const employeeStatsByInn = new Map();
-    for (const row of employeeRows) {
-        employeeStatsByInn.set(row.inn, {
-            employeeDebtorsCount: Number(row.employee_debtors_count || 0),
-            employeeDebtAmount: Number(row.employee_debt_amount || 0),
-        });
-    }
-
-    let result = baseRows.map((row) => {
+    let items = baseRows.map((row) => {
         const latestCommission = latestCommissionByInn.get(row.inn);
         const latestEvent = latestEventByInn.get(row.inn);
         const latestFile = latestFileByInn.get(row.inn);
-        const employeeStats = employeeStatsByInn.get(row.inn) || {
-            employeeDebtorsCount: 0,
-            employeeDebtAmount: 0,
-        };
 
         return {
             inn: String(row.inn),
             name: row.name || '',
             region: row.region || '',
             kno: row.kno || '',
-            balances: (balancesByInn.get(row.inn) || []).sort((a, b) =>
-                b.date.localeCompare(a.date),
-            ),
+            balances: [],
             commissionStatus: mapCommissionStatus(
                 latestCommission?.commission_status,
                 latestEvent?.event_status,
@@ -376,14 +610,37 @@ export async function getCommissionsList({
                 latestCommission?.interaction_status || latestEvent?.event_result,
             ),
             protocolFileName: normalizeProtocolName(latestFile?.file_name),
-            employeeDebtorsCount: employeeStats.employeeDebtorsCount,
-            employeeDebtAmount: employeeStats.employeeDebtAmount,
         };
     });
 
-    if (status) {
-        result = result.filter((item) => item.commissionStatus === status);
+    const itemMap = new Map(items.map((item) => [item.inn, item]));
+
+    for (const row of balanceRows) {
+        const item = itemMap.get(String(row.inn));
+        if (!item) continue;
+
+        item.balances.push({
+            date:
+                row.balance_date instanceof Date
+                    ? row.balance_date.toISOString().slice(0, 10)
+                    : String(row.balance_date).slice(0, 10),
+            amount: Number(row.total_sum || 0),
+        });
     }
 
-    return result;
+    items = items.map((item) => ({
+        ...item,
+        balances: item.balances.sort((a, b) => b.date.localeCompare(a.date)),
+    }));
+
+    if (status) {
+        items = items.filter((item) => item.commissionStatus === status);
+    }
+
+    return {
+        items,
+        total,
+        hasMore: offset + baseRows.length < total,
+        nextOffset: offset + baseRows.length,
+    };
 }
