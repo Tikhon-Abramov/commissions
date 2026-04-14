@@ -47,6 +47,7 @@ export type CommissionsPageResponse = {
     success: true;
     data: {
         items: CommissionItemDto[];
+        dates: string[];
         nextCursor: string | null;
         hasMore: boolean;
     };

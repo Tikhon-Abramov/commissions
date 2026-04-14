@@ -17,10 +17,7 @@ commissionsRouter.get('/meta', async (req, res, next) => {
             userRegion: req.user?.region || '',
         });
 
-        res.json({
-            success: true,
-            data,
-        });
+        res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
@@ -28,20 +25,16 @@ commissionsRouter.get('/meta', async (req, res, next) => {
 
 commissionsRouter.get('/summary', async (req, res, next) => {
     try {
-        const { region = '', quarter = '', search = '' } = req.query;
+        const { region = '', quarter = '' } = req.query;
 
         const data = await getCommissionsSummary({
             region: String(region),
             quarter: String(quarter),
-            search: String(search),
             isAdmin: Boolean(req.user?.isAdmin),
             userRegion: req.user?.region || '',
         });
 
-        res.json({
-            success: true,
-            data,
-        });
+        res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
@@ -52,27 +45,24 @@ commissionsRouter.get('/', async (req, res, next) => {
         const {
             region = '',
             quarter = '',
-            status = '',
             search = '',
-            offset = '0',
+            status = '',
+            cursor = '',
             limit = '50',
         } = req.query;
 
         const data = await getCommissionsPage({
             region: String(region),
             quarter: String(quarter),
-            status: String(status),
-            search: String(search),
+            search: String(search).trim(),
+            status: String(status).trim(),
             isAdmin: Boolean(req.user?.isAdmin),
             userRegion: req.user?.region || '',
-            offset: Number(offset || 0),
+            cursor: String(cursor || ''),
             limit: Math.min(Number(limit || 50), 100),
         });
 
-        res.json({
-            success: true,
-            data,
-        });
+        res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
