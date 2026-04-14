@@ -31,7 +31,6 @@ app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/feedback', feedbackRouter);
 app.use('/api/me', meRouter);
-app.use('/api/commissions', commissionsRouter);
 
 app.use((err, _req, res, _next) => {
     console.error(err);

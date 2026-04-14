@@ -1,0 +1,38 @@
+export type CommissionsMetaOption = {
+    value: string;
+    label: string;
+};
+
+export type CommissionsMetaResponse = {
+    success: true;
+    data: {
+        regions: CommissionsMetaOption[];
+        quarters: CommissionsMetaOption[];
+        defaultQuarter: string;
+        userRegion: string;
+        isAdmin: boolean;
+    };
+};
+
+export type CommissionBalanceDto = {
+    date: string;
+    amount: number;
+};
+
+export type CommissionItemDto = {
+    inn: string;
+    name: string;
+    region: string;
+    kno: string;
+    balances: CommissionBalanceDto[];
+    commissionStatus: string;
+    interactionStatus: string;
+    protocolFileName: string;
+    employeeDebtorsCount: number;
+    employeeDebtAmount: number;
+};
+
+export type CommissionsListResponse = {
+    success: true;
+    data: CommissionItemDto[];
+};
