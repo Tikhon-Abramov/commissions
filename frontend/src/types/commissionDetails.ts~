@@ -1,0 +1,29 @@
+export type CommissionDetailsResponse = {
+    success: true;
+    data: {
+        inn: string;
+        name: string;
+        region: string;
+        kno: string;
+        commission: {
+            id: number | null;
+            comEvents: string;
+            comDate: string;
+        };
+        event: {
+            id: number | null;
+            events: string;
+            actionDate: string;
+        };
+        file: {
+            id: number | null;
+            originalFilename: string;
+            uploadedAt: string;
+        };
+        balances: Array<{
+            date: string;
+            saldo: number | null;
+            knsum: number | null;
+        }>;
+    };
+};

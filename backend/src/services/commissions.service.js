@@ -566,3 +566,289 @@ export async function getCommissionsPage({
         hasMore,
     };
 }
+
+function assertRegionAccess({ requestedRegion, isAdmin, userRegion }) {
+    if (isAdmin) return;
+    if (requestedRegion && userRegion && requestedRegion !== userRegion) {
+        const error = new Error('Нет доступа к чужому региону');
+        error.status = 403;
+        throw error;
+    }
+}
+
+async function getBaseMetaRow({ inn, quarter, region, isAdmin, userRegion }) {
+    assertRegionAccess({
+        requestedRegion: region,
+        isAdmin,
+        userRegion,
+    });
+
+    const params = [inn, quarter];
+    let regionSql = '';
+
+    if (isAdmin) {
+        if (region) {
+            regionSql = 'AND m.region = ?';
+            params.push(region);
+        }
+    } else if (userRegion) {
+        regionSql = 'AND m.region = ?';
+        params.push(userRegion);
+    }
+
+    const [rows] = await pool.query(
+        `
+      SELECT
+        TRIM(CAST(m.inn AS CHAR)) AS inn,
+        m.name,
+        m.region,
+        m.kno
+      FROM meta m
+      WHERE TRIM(CAST(m.inn AS CHAR)) = ?
+        AND m.period = ?
+        ${regionSql}
+      LIMIT 1
+    `,
+        params,
+    );
+
+    return rows[0] || null;
+}
+
+export async function getCommissionDetails({
+                                               inn,
+                                               quarter,
+                                               region,
+                                               isAdmin,
+                                               userRegion,
+                                           }) {
+    const metaRow = await getBaseMetaRow({
+        inn,
+        quarter,
+        region,
+        isAdmin,
+        userRegion,
+    });
+
+    if (!metaRow) {
+        const error = new Error('Запись не найдена');
+        error.status = 404;
+        throw error;
+    }
+
+    const [commissionRows] = await pool.query(
+        `
+      SELECT
+        id,
+        com_events,
+        com_date
+      FROM commissions
+      WHERE TRIM(CAST(inn AS CHAR)) = ?
+        AND period = ?
+      ORDER BY com_date DESC, id DESC
+      LIMIT 1
+    `,
+        [inn, quarter],
+    );
+
+    const [eventRows] = await pool.query(
+        `
+      SELECT
+        id,
+        events,
+        action_date
+      FROM events
+      WHERE TRIM(CAST(inn AS CHAR)) = ?
+        AND period = ?
+      ORDER BY action_date DESC, id DESC
+      LIMIT 1
+    `,
+        [inn, quarter],
+    );
+
+    const [fileRows] = await pool.query(
+        `
+      SELECT
+        id,
+        original_filename,
+        uploaded_at
+      FROM files
+      WHERE TRIM(CAST(inn AS CHAR)) = ?
+        AND period = ?
+      ORDER BY uploaded_at DESC, id DESC
+      LIMIT 1
+    `,
+        [inn, quarter],
+    );
+
+    const [balanceRows] = await pool.query(
+        `
+      SELECT
+        DATE_FORMAT(sum_date, '%Y-%m-%d') AS sum_date,
+        saldo,
+        knsum
+      FROM saldo
+      WHERE TRIM(CAST(inn AS CHAR)) = ?
+        AND period = ?
+      ORDER BY sum_date DESC
+      LIMIT 7
+    `,
+        [inn, quarter],
+    );
+
+    return {
+        inn: metaRow.inn,
+        name: metaRow.name || '',
+        region: metaRow.region || '',
+        kno: metaRow.kno || '',
+        commission: {
+            id: commissionRows[0]?.id ?? null,
+            comEvents: commissionRows[0]?.com_events ?? '',
+            comDate: commissionRows[0]?.com_date ? toIsoDate(commissionRows[0].com_date) : '',
+        },
+        event: {
+            id: eventRows[0]?.id ?? null,
+            events: eventRows[0]?.events ?? '',
+            actionDate: eventRows[0]?.action_date ? toIsoDate(eventRows[0].action_date) : '',
+        },
+        file: {
+            id: fileRows[0]?.id ?? null,
+            originalFilename: fileRows[0]?.original_filename ?? '',
+            uploadedAt: fileRows[0]?.uploaded_at ? toIsoDate(fileRows[0].uploaded_at) : '',
+        },
+        balances: balanceRows.map((row) => ({
+            date: row.sum_date,
+            saldo: row.saldo === null ? null : Number(row.saldo),
+            knsum: row.knsum === null ? null : Number(row.knsum),
+        })),
+    };
+}
+
+export async function updateCommissionDetails({
+                                                  inn,
+                                                  quarter,
+                                                  region,
+                                                  isAdmin,
+                                                  userRegion,
+                                                  payload,
+                                              }) {
+    const metaRow = await getBaseMetaRow({
+        inn,
+        quarter,
+        region,
+        isAdmin,
+        userRegion,
+    });
+
+    if (!metaRow) {
+        const error = new Error('Запись не найдена');
+        error.status = 404;
+        throw error;
+    }
+
+    const {
+        commissionStatus = '',
+        commissionDate = '',
+        interactionStatus = '',
+    } = payload || {};
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const [existingCommissionRows] = await connection.query(
+            `
+        SELECT id
+        FROM commissions
+        WHERE TRIM(CAST(inn AS CHAR)) = ?
+          AND period = ?
+        ORDER BY com_date DESC, id DESC
+        LIMIT 1
+      `,
+            [inn, quarter],
+        );
+
+        if (existingCommissionRows.length) {
+            await connection.query(
+                `
+          UPDATE commissions
+          SET
+            com_events = ?,
+            com_date = ?
+          WHERE id = ?
+        `,
+                [
+                    commissionStatus || null,
+                    commissionDate || null,
+                    existingCommissionRows[0].id,
+                ],
+            );
+        } else if (commissionStatus || commissionDate) {
+            await connection.query(
+                `
+          INSERT INTO commissions (
+            inn,
+            com_events,
+            com_date,
+            period
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+                [inn, commissionStatus || null, commissionDate || null, quarter],
+            );
+        }
+
+        const [existingEventRows] = await connection.query(
+            `
+        SELECT id
+        FROM events
+        WHERE TRIM(CAST(inn AS CHAR)) = ?
+          AND period = ?
+        ORDER BY action_date DESC, id DESC
+        LIMIT 1
+      `,
+            [inn, quarter],
+        );
+
+        if (existingEventRows.length) {
+            await connection.query(
+                `
+          UPDATE events
+          SET
+            events = ?
+          WHERE id = ?
+        `,
+                [interactionStatus || null, existingEventRows[0].id],
+            );
+        } else if (interactionStatus) {
+            await connection.query(
+                `
+          INSERT INTO events (
+            inn,
+            events,
+            action_date,
+            period
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+                [inn, interactionStatus || null, commissionDate || null, quarter],
+            );
+        }
+
+        await connection.commit();
+
+        return await getCommissionDetails({
+            inn,
+            quarter,
+            region,
+            isAdmin,
+            userRegion,
+        });
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
