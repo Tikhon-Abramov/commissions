@@ -93,7 +93,7 @@ commissionsRouter.get('/:inn/details', async (req, res, next) => {
 
 commissionsRouter.put(
     '/:inn/details',
-    protocolUpload.single('protocolFile'),
+    protocolUpload.array('protocolFile'),
     async (req, res, next) => {
         try {
             const { inn } = req.params;
@@ -130,7 +130,34 @@ commissionsRouter.get('/:inn/protocol/:fileId', async (req, res, next) => {
             userRegion: req.user?.region || '',
         });
 
-        res.download(file.absolutePath, file.originalFilename);
+        const encodedFileName = encodeURIComponent(file.originalFilename);
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${file.safeFallbackName}"; filename*=UTF-8''${encodedFileName}`,
+        );
+
+        res.download(file.absolutePath, file.safeFallbackName);
+    } catch (error) {
+        next(error);
+    }
+});
+
+commissionsRouter.delete('/:inn/protocol/:fileId', async (req, res, next) => {
+    try {
+        const { inn, fileId } = req.params;
+        const { quarter = '', region = '' } = req.query;
+
+        const data = await deleteProtocolFile({
+            inn: String(inn),
+            fileId: Number(fileId),
+            quarter: String(quarter),
+            region: String(region),
+            isAdmin: Boolean(req.user?.isAdmin),
+            userRegion: req.user?.region || '',
+        });
+
+        res.json({ success: true, data });
     } catch (error) {
         next(error);
     }

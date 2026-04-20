@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 
 const META_TTL_MS = 60 * 60 * 1000;
 const SUMMARY_TTL_MS = 60 * 1000;
@@ -22,6 +23,11 @@ function setCache(key, value, ttlMs) {
         value,
         expiresAt: Date.now() + ttlMs,
     });
+}
+
+function makeSafeAsciiFilename(fileName) {
+    const normalized = safeString(fileName) || 'file';
+    return normalized.replace(/[^\x20-\x7E]/g, '_');
 }
 
 function toIsoDate(value) {
@@ -1126,6 +1132,57 @@ export async function getProtocolFileForDownload({
 
     const [rows] = await pool.query(
         `
+            SELECT
+                id,
+                original_filename,
+                new_filename
+            FROM files
+            WHERE id = ?
+              AND period = ?
+              AND TRIM(CAST(inn AS CHAR)) = ?
+                LIMIT 1
+        `,
+        [fileId, quarter, inn],
+    );
+
+    if (!rows.length) {
+        const error = new Error('Файл не найден');
+        error.status = 404;
+        throw error;
+    }
+
+    return {
+        id: rows[0].id,
+        originalFilename: rows[0].original_filename,
+        safeFallbackName: makeSafeAsciiFilename(rows[0].original_filename),
+        absolutePath: path.resolve(
+            process.cwd(),
+            'uploads',
+            'protocols',
+            rows[0].new_filename,
+        ),
+    };
+}
+
+
+export async function deleteProtocolFile({
+                                             inn,
+                                             fileId,
+                                             quarter,
+                                             region,
+                                             isAdmin,
+                                             userRegion,
+                                         }) {
+    await assertCommissionAccess({
+        inn,
+        quarter,
+        region,
+        isAdmin,
+        userRegion,
+    });
+
+    const [rows] = await pool.query(
+        `
       SELECT
         id,
         original_filename,
@@ -1145,9 +1202,27 @@ export async function getProtocolFileForDownload({
         throw error;
     }
 
-    return {
-        id: rows[0].id,
-        originalFilename: rows[0].original_filename,
-        absolutePath: path.resolve(process.cwd(), 'uploads', 'protocols', rows[0].new_filename),
-    };
+    const fileRow = rows[0];
+    const absolutePath = path.resolve(
+        process.cwd(),
+        'uploads',
+        'protocols',
+        fileRow.new_filename,
+    );
+
+    await pool.query(
+        `
+      DELETE FROM files
+      WHERE id = ?
+    `,
+        [fileId],
+    );
+
+    try {
+        await fs.unlink(absolutePath);
+    } catch {
+        // если файла на диске уже нет, просто не падаем
+    }
+
+    return { deletedId: fileId };
 }
