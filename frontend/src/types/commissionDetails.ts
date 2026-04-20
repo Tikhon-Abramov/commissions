@@ -26,11 +26,8 @@ export type CommissionDetailsResponse = {
         };
         currentSaldoEns: string | number | null;
         currentRegionDebt: string | number | null;
-        previousPeriods: Array<{
-            periodLabel: string;
-            saldoEns: string | number | null;
-            regionDebt: string | number | null;
-        }>;
+        previousPeriodsSaldo: Array<{ date: string; value: number | null }>;
+        previousPeriodsKnsum: Array<{ date: string; value: number | null }>;
         enforcement: {
             demandExists: string | null;
             decision46Exists: string | null;
@@ -56,6 +53,11 @@ export type CommissionDetailsResponse = {
             id: number | null;
             originalFilename: string;
             uploadedAt: string;
+            items: Array<{
+                id: number;
+                originalFilename: string;
+                uploadedAt: string;
+            }>;
         };
         balances: Array<{
             date: string;

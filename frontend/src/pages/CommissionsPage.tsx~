@@ -793,25 +793,348 @@ export function CommissionsPage() {
 
             {selectedInn ? (
                 <>
-                    <CommissionDetailsDrawer
-                        open={Boolean(selectedInn)}
-                        loading={detailsLoading}
-                        saving={detailsSaving}
-                        error={detailsError}
-                        details={details}
-                        onClose={() => {
-                            setSelectedInn(null);
-                            setDetails(null);
-                            setDetailsError('');
-                            setSelectedProtocolFile(null);
-                        }}
-                        onSave={handleSaveDetails}
-                        onChange={(updater) => {
-                            setDetails((prev) => (prev ? updater(prev) : prev));
-                        }}
-                        onPickFile={setSelectedProtocolFile}
-                        onDownloadFile={handleDownloadProtocol}
-                    />
+                    <ModalOverlay onClick={closeDetailsModal} />
+                    <Drawer>
+                        <DrawerHeader>
+                            <DrawerTitle>Просмотр ИНН</DrawerTitle>
+                            <Button type="button" onClick={closeDetailsModal}>
+                                Закрыть
+                            </Button>
+                        </DrawerHeader>
+
+                        <DrawerBody>
+                            {detailsLoading ? <LoadingText>Загрузка...</LoadingText> : null}
+                            {detailsError ? <ErrorText>{detailsError}</ErrorText> : null}
+
+                            {details ? (
+                                <>
+                                    <Section>
+                                        <SectionTitle>Основная информация</SectionTitle>
+                                        <InfoGrid>
+                                            <InfoCard>
+                                                <Label>ИНН</Label>
+                                                <Value>{displayOrDash(details.inn)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Код НО</Label>
+                                                <Value>{displayOrDash(details.kno)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>ОКТМО</Label>
+                                                <Value>{displayOrDash(details.oktmo)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Сотрудники с задолженностью</Label>
+                                                <Value>{displayOrDash(details.employeesWithDebt)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Кол-во объектов недвижимости</Label>
+                                                <Value>{displayOrDash(details.realEstateCount)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Кол-во земельных участков</Label>
+                                                <Value>{displayOrDash(details.landCount)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Кол-во транспортных средств</Label>
+                                                <Value>{displayOrDash(details.transportCount)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Адрес</Label>
+                                                <Value>{displayOrDash(details.address)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>ОКВЭД</Label>
+                                                <Value>{displayOrDash(details.okved)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Наименование</Label>
+                                                <Value>{displayOrDash(details.name)}</Value>
+                                            </InfoCard>
+                                        </InfoGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Выручка</SectionTitle>
+                                        <InfoGrid>
+                                            <InfoCard>
+                                                <Label>2024</Label>
+                                                <Value>{displayOrDash(details.revenue?.['2024'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2023</Label>
+                                                <Value>{displayOrDash(details.revenue?.['2023'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2022</Label>
+                                                <Value>{displayOrDash(details.revenue?.['2022'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2021</Label>
+                                                <Value>{displayOrDash(details.revenue?.['2021'])}</Value>
+                                            </InfoCard>
+                                        </InfoGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Среднесписочная численность</SectionTitle>
+                                        <InfoGrid>
+                                            <InfoCard>
+                                                <Label>2024</Label>
+                                                <Value>{displayOrDash(details.avgHeadcount?.['2024'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2023</Label>
+                                                <Value>{displayOrDash(details.avgHeadcount?.['2023'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2022</Label>
+                                                <Value>{displayOrDash(details.avgHeadcount?.['2022'])}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>2021</Label>
+                                                <Value>{displayOrDash(details.avgHeadcount?.['2021'])}</Value>
+                                            </InfoCard>
+                                        </InfoGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Текущие показатели</SectionTitle>
+                                        <InfoGrid>
+                                            <InfoCard>
+                                                <Label>Сальдо ЕНС</Label>
+                                                <Value>{displayOrDash(details.currentSaldoEns)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Задолженность перед регионом с учетом пени, справочная информация</Label>
+                                                <Value>{displayOrDash(details.currentRegionDebt)}</Value>
+                                            </InfoCard>
+                                        </InfoGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Данные за предыдущие периоды</SectionTitle>
+                                        <HistoryTable>
+                                            {previousPeriods.length ? (
+                                                previousPeriods.map((row) => (
+                                                    <HistoryRow key={row.periodLabel}>
+                                                        <div>{row.periodLabel}</div>
+                                                        <div>Сальдо ЕНС: {displayOrDash(row.saldoEns)}</div>
+                                                        <div>Задолженность перед регионом: {displayOrDash(row.regionDebt)}</div>
+                                                    </HistoryRow>
+                                                ))
+                                            ) : (
+                                                <InfoCard>
+                                                    <Value>Нет данных</Value>
+                                                </InfoCard>
+                                            )}
+                                        </HistoryTable>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Меры взыскания</SectionTitle>
+                                        <InfoGrid>
+                                            <InfoCard>
+                                                <Label>Наличие требования</Label>
+                                                <Value>{displayOrDash(details.enforcement?.demandExists)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Наличие решения 46ст</Label>
+                                                <Value>{displayOrDash(details.enforcement?.decision46Exists)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Кол-во постановлений 47ст</Label>
+                                                <Value>{displayOrDash(details.enforcement?.post47Count)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Остаток задолженности по 47ст</Label>
+                                                <Value>{displayOrDash(details.enforcement?.post47DebtRest)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Кол-во ЗВСП по 48ст</Label>
+                                                <Value>{displayOrDash(details.enforcement?.zvsp48Count)}</Value>
+                                            </InfoCard>
+                                            <InfoCard>
+                                                <Label>Остаток задолженности по ЗВСП</Label>
+                                                <Value>{displayOrDash(details.enforcement?.zvspDebtRest)}</Value>
+                                            </InfoCard>
+                                        </InfoGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>Проведение комиссии</SectionTitle>
+                                        <EditorGrid>
+                                            <Field>
+                                                <FieldLabel>Статус комиссии</FieldLabel>
+                                                <FieldInput
+                                                    value={details.commission.comEvents}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    commission: {
+                                                                        ...prev.commission,
+                                                                        comEvents: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Дата проведения комиссии</FieldLabel>
+                                                <FieldInput
+                                                    type="date"
+                                                    value={details.commission.comDate || ''}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    commission: {
+                                                                        ...prev.commission,
+                                                                        comDate: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Результат взаимодействия с НП</FieldLabel>
+                                                <FieldTextarea
+                                                    value={details.event.events}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    event: {
+                                                                        ...prev.event,
+                                                                        events: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>
+                                                    Меры воздействия со стороны региональных / местных органов власти, прокуратура, правоохранительные органы, ФССП и ФОИВ
+                                                </FieldLabel>
+                                                <FieldTextarea
+                                                    value={details.commission.impactMeasures || ''}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    commission: {
+                                                                        ...prev.commission,
+                                                                        impactMeasures: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>
+                                                    Участие в комиссии представителей органов государственной власти (ОГВ) и органов местного самоуправления (ОМСУ)
+                                                </FieldLabel>
+                                                <FieldTextarea
+                                                    value={details.commission.ogvOmsuParticipation || ''}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    commission: {
+                                                                        ...prev.commission,
+                                                                        ogvOmsuParticipation: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <Field>
+                                                <FieldLabel>Примечание к комиссии</FieldLabel>
+                                                <FieldTextarea
+                                                    value={details.commission.note || ''}
+                                                    onChange={(e) =>
+                                                        setDetails((prev) =>
+                                                            prev
+                                                                ? {
+                                                                    ...prev,
+                                                                    commission: {
+                                                                        ...prev.commission,
+                                                                        note: e.target.value,
+                                                                    },
+                                                                }
+                                                                : prev,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+
+                                            <InfoCard>
+                                                <Label>Файл протокола</Label>
+                                                <Value>
+                                                    {details.file.originalFilename
+                                                        ? details.file.originalFilename
+                                                        : 'Не загружен'}
+                                                </Value>
+                                            </InfoCard>
+                                        </EditorGrid>
+                                    </Section>
+
+                                    <Section>
+                                        <SectionTitle>История изменений</SectionTitle>
+                                        <HistoryList>
+                                            {historyChanges.length ? (
+                                                historyChanges.map((row, index) => (
+                                                    <HistoryChangeCard key={`${row.changedAt}-${index}`}>
+                                                        <div><b>{displayOrDash(row.changedAt)}</b></div>
+                                                        <div>{displayOrDash(row.text)}</div>
+                                                    </HistoryChangeCard>
+                                                ))
+                                            ) : (
+                                                <InfoCard>
+                                                    <Value>Нет данных</Value>
+                                                </InfoCard>
+                                            )}
+                                        </HistoryList>
+                                    </Section>
+                                </>
+                            ) : null}
+                        </DrawerBody>
+
+                        <DrawerFooter>
+                            <Button type="button" onClick={closeDetailsModal}>
+                                Закрыть
+                            </Button>
+                            <Button
+                                type="button"
+                                $primary
+                                onClick={handleSaveDetails}
+                                disabled={detailsSaving || detailsLoading || !details}
+                            >
+                                {detailsSaving ? 'Сохранение...' : 'Сохранить'}
+                            </Button>
+                        </DrawerFooter>
+                    </Drawer>
                 </>
             ) : null}
         </PageWrap>

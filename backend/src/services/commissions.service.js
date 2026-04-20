@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import path from 'node:path';
 
 const META_TTL_MS = 60 * 60 * 1000;
 const SUMMARY_TTL_MS = 60 * 1000;
@@ -684,33 +685,36 @@ async function assertCommissionAccess({ inn, quarter, region, isAdmin, userRegio
     return row;
 }
 
-async function getCommissionPreviousPeriods(inn, currentQuarter) {
+async function getPreviousPeriodsHistoryByDate(inn) {
     const [rows] = await pool.query(
         `
             SELECT
-                p.id,
-                p.quartal,
-                p.year,
-                MAX(CAST(s.saldo AS DECIMAL(18,2))) AS saldo_ens,
-                MAX(CAST(s.knsum AS DECIMAL(18,2))) AS region_debt
-            FROM periods p
-                     LEFT JOIN saldo s
-                               ON s.period = p.id
-                                   AND TRIM(CAST(s.inn AS CHAR)) = ?
-            WHERE p.id <> ?
-            GROUP BY p.id, p.quartal, p.year
-            HAVING saldo_ens IS NOT NULL OR region_debt IS NOT NULL
-            ORDER BY p.year DESC, p.quartal DESC
-                LIMIT 8
+                DATE_FORMAT(sum_date, '%Y-%m-%d') AS date,
+        MAX(CAST(saldo AS DECIMAL(18,2))) AS saldo_value,
+        MAX(CAST(knsum AS DECIMAL(18,2))) AS knsum_value
+            FROM saldo
+            WHERE TRIM(CAST(inn AS CHAR)) = ?
+            GROUP BY DATE_FORMAT(sum_date, '%Y-%m-%d')
+            ORDER BY date DESC
+                LIMIT 7
         `,
-        [inn, currentQuarter],
+        [inn],
     );
 
-    return rows.map((row) => ({
-        periodLabel: `${row.quartal} квартал ${row.year}`,
-        saldoEns: safeNumber(row.saldo_ens),
-        regionDebt: safeNumber(row.region_debt),
-    }));
+    return {
+        previousPeriodsSaldo: rows
+            .filter((row) => row.saldo_value !== null)
+            .map((row) => ({
+                date: row.date,
+                value: safeNumber(row.saldo_value),
+            })),
+        previousPeriodsKnsum: rows
+            .filter((row) => row.knsum_value !== null)
+            .map((row) => ({
+                date: row.date,
+                value: safeNumber(row.knsum_value),
+            })),
+    };
 }
 
 async function getCommissionBalances(inn, quarter) {
@@ -779,7 +783,7 @@ async function getLatestEventRow(inn, quarter) {
     return rows[0] || null;
 }
 
-async function getLatestFileRow(inn, quarter) {
+async function getLatestFileRows(inn, quarter) {
     const [rows] = await pool.query(
         `
             SELECT
@@ -791,12 +795,11 @@ async function getLatestFileRow(inn, quarter) {
             WHERE period = ?
               AND TRIM(CAST(inn AS CHAR)) = ?
             ORDER BY uploaded_at DESC, id DESC
-                LIMIT 1
         `,
         [quarter, inn],
     );
 
-    return rows[0] || null;
+    return rows;
 }
 
 export async function getCommissionDetails({
@@ -816,12 +819,12 @@ export async function getCommissionDetails({
 
     const latestDate = await getLatestDate(quarter);
 
-    const [commissionRow, eventRow, fileRow, previousPeriods, balances] =
+    const [commissionRow, eventRow, fileRows, historyByDate, balances] =
         await Promise.all([
             getLatestCommissionRow(inn, quarter),
             getLatestEventRow(inn, quarter),
-            getLatestFileRow(inn, quarter),
-            getCommissionPreviousPeriods(inn, quarter),
+            getLatestFileRows(inn, quarter),
+            getPreviousPeriodsHistoryByDate(inn),
             getCommissionBalances(inn, quarter),
         ]);
 
@@ -877,7 +880,9 @@ export async function getCommissionDetails({
 
         currentSaldoEns,
         currentRegionDebt,
-        previousPeriods,
+
+        previousPeriodsSaldo: historyByDate.previousPeriodsSaldo,
+        previousPeriodsKnsum: historyByDate.previousPeriodsKnsum,
 
         enforcement: {
             demandExists: '',
@@ -910,9 +915,14 @@ export async function getCommissionDetails({
         },
 
         file: {
-            id: fileRow?.id ?? null,
-            originalFilename: safeString(fileRow?.original_filename),
-            uploadedAt: safeString(fileRow?.uploaded_at),
+            id: fileRows[0]?.id ?? null,
+            originalFilename: safeString(fileRows[0]?.original_filename),
+            uploadedAt: safeString(fileRows[0]?.uploaded_at),
+            items: fileRows.map((row) => ({
+                id: row.id,
+                originalFilename: safeString(row.original_filename),
+                uploadedAt: safeString(row.uploaded_at),
+            })),
         },
 
         balances,
@@ -927,6 +937,7 @@ export async function updateCommissionDetails({
                                                   isAdmin,
                                                   userRegion,
                                                   payload,
+                                                  uploadedFile,
                                               }) {
     await assertCommissionAccess({
         inn,
@@ -1059,6 +1070,27 @@ export async function updateCommissionDetails({
             );
         }
 
+        if (uploadedFile) {
+            await connection.query(
+                `
+          INSERT INTO files (
+            uploaded_at,
+            original_filename,
+            new_filename,
+            inn,
+            period
+          )
+          VALUES (NOW(), ?, ?, ?, ?)
+        `,
+                [
+                    uploadedFile.originalname,
+                    uploadedFile.filename,
+                    inn,
+                    quarter,
+                ],
+            );
+        }
+
         await connection.commit();
     } catch (error) {
         await connection.rollback();
@@ -1074,4 +1106,48 @@ export async function updateCommissionDetails({
         isAdmin,
         userRegion,
     });
+}
+
+export async function getProtocolFileForDownload({
+                                                     inn,
+                                                     fileId,
+                                                     quarter,
+                                                     region,
+                                                     isAdmin,
+                                                     userRegion,
+                                                 }) {
+    await assertCommissionAccess({
+        inn,
+        quarter,
+        region,
+        isAdmin,
+        userRegion,
+    });
+
+    const [rows] = await pool.query(
+        `
+      SELECT
+        id,
+        original_filename,
+        new_filename
+      FROM files
+      WHERE id = ?
+        AND period = ?
+        AND TRIM(CAST(inn AS CHAR)) = ?
+      LIMIT 1
+    `,
+        [fileId, quarter, inn],
+    );
+
+    if (!rows.length) {
+        const error = new Error('Файл не найден');
+        error.status = 404;
+        throw error;
+    }
+
+    return {
+        id: rows[0].id,
+        originalFilename: rows[0].original_filename,
+        absolutePath: path.resolve(process.cwd(), 'uploads', 'protocols', rows[0].new_filename),
+    };
 }

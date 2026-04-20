@@ -4,6 +4,8 @@ import {
     getCommissionsMeta,
     getCommissionsPage,
     getCommissionsSummary,
+    getCommissionDetails,
+    updateCommissionDetails,
 } from '../services/commissions.service.js';
 
 export const commissionsRouter = Router();
@@ -60,6 +62,45 @@ commissionsRouter.get('/', async (req, res, next) => {
             userRegion: req.user?.region || '',
             cursor: String(cursor || ''),
             limit: Math.min(Number(limit || 50), 100),
+        });
+
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+commissionsRouter.get('/:inn/details', async (req, res, next) => {
+    try {
+        const { inn } = req.params;
+        const { quarter = '', region = '' } = req.query;
+
+        const data = await getCommissionDetails({
+            inn: String(inn),
+            quarter: String(quarter),
+            region: String(region),
+            isAdmin: Boolean(req.user?.isAdmin),
+            userRegion: req.user?.region || '',
+        });
+
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+commissionsRouter.put('/:inn/details', async (req, res, next) => {
+    try {
+        const { inn } = req.params;
+        const { quarter = '', region = '' } = req.query;
+
+        const data = await updateCommissionDetails({
+            inn: String(inn),
+            quarter: String(quarter),
+            region: String(region),
+            isAdmin: Boolean(req.user?.isAdmin),
+            userRegion: req.user?.region || '',
+            payload: req.body,
         });
 
         res.json({ success: true, data });

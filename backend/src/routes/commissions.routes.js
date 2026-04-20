@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { protocolUpload } from '../middleware/upload.middleware.js';
 import {
     getCommissionsMeta,
     getCommissionsPage,
     getCommissionsSummary,
     getCommissionDetails,
     updateCommissionDetails,
+    getProtocolFileForDownload,
 } from '../services/commissions.service.js';
 
 export const commissionsRouter = Router();
@@ -89,21 +91,46 @@ commissionsRouter.get('/:inn/details', async (req, res, next) => {
     }
 });
 
-commissionsRouter.put('/:inn/details', async (req, res, next) => {
+commissionsRouter.put(
+    '/:inn/details',
+    protocolUpload.single('protocolFile'),
+    async (req, res, next) => {
+        try {
+            const { inn } = req.params;
+            const { quarter = '', region = '' } = req.query;
+
+            const data = await updateCommissionDetails({
+                inn: String(inn),
+                quarter: String(quarter),
+                region: String(region),
+                isAdmin: Boolean(req.user?.isAdmin),
+                userRegion: req.user?.region || '',
+                payload: req.body,
+                uploadedFile: req.file ?? null,
+            });
+
+            res.json({ success: true, data });
+        } catch (error) {
+            next(error);
+        }
+    },
+);
+
+commissionsRouter.get('/:inn/protocol/:fileId', async (req, res, next) => {
     try {
-        const { inn } = req.params;
+        const { inn, fileId } = req.params;
         const { quarter = '', region = '' } = req.query;
 
-        const data = await updateCommissionDetails({
+        const file = await getProtocolFileForDownload({
             inn: String(inn),
+            fileId: Number(fileId),
             quarter: String(quarter),
             region: String(region),
             isAdmin: Boolean(req.user?.isAdmin),
             userRegion: req.user?.region || '',
-            payload: req.body,
         });
 
-        res.json({ success: true, data });
+        res.download(file.absolutePath, file.originalFilename);
     } catch (error) {
         next(error);
     }
