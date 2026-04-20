@@ -471,7 +471,7 @@ export function CommissionsPage() {
     const [detailsSaving, setDetailsSaving] = useState(false);
     const [detailsError, setDetailsError] = useState('');
     const [details, setDetails] = useState<CommissionDetailsResponse['data'] | null>(null);
-    const [selectedProtocolFile, setSelectedProtocolFile] = useState<File | null>(null);
+    const [selectedProtocolFiles, setSelectedProtocolFiles] = useState<File[]>([]);
 
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -581,7 +581,7 @@ export function CommissionsPage() {
 
             let response: CommissionDetailsResponse;
 
-            if (selectedProtocolFile) {
+            if (selectedProtocolFiles.length) {
                 const formData = new FormData();
                 formData.append('commissionStatus', details.commission.comEvents || '');
                 formData.append('commissionDate', details.commission.comDate || '');
@@ -589,7 +589,10 @@ export function CommissionsPage() {
                 formData.append('impactMeasures', details.commission.impactMeasures || '');
                 formData.append('ogvOmsuParticipation', details.commission.ogvOmsuParticipation || '');
                 formData.append('note', details.commission.note || '');
-                formData.append('protocolFile', selectedProtocolFile);
+
+                selectedProtocolFiles.forEach((file) => {
+                    formData.append('protocolFile', file);
+                });
 
                 response = await apiRequest<CommissionDetailsResponse>(
                     `/commissions/${selectedInn}/details?${params.toString()}`,
@@ -616,7 +619,7 @@ export function CommissionsPage() {
             }
 
             setDetails(response.data);
-            setSelectedProtocolFile(null);
+            setSelectedProtocolFiles([]);
             await refetchPage();
         } catch (err) {
             setDetailsError(err instanceof Error ? err.message : 'Ошибка сохранения');
@@ -624,6 +627,35 @@ export function CommissionsPage() {
             setDetailsSaving(false);
         }
     };
+
+    const handleDeleteProtocol = async (fileId: number | null) => {
+        if (!fileId || !selectedInn) return;
+
+        const params = new URLSearchParams();
+        if (selectedQuarter) params.set('quarter', selectedQuarter);
+        if (selectedRegion) params.set('region', selectedRegion);
+
+        try {
+            setDetailsError('');
+
+            await apiRequest<{ success: true; data: { deletedId: number } }>(
+                `/commissions/${selectedInn}/protocol/${fileId}?${params.toString()}`,
+                {
+                    method: 'DELETE',
+                },
+            );
+
+            const refreshed = await apiRequest<CommissionDetailsResponse>(
+                `/commissions/${selectedInn}/details?${params.toString()}`,
+            );
+
+            setDetails(refreshed.data);
+            await refetchPage();
+        } catch (err) {
+            setDetailsError(err instanceof Error ? err.message : 'Ошибка удаления файла');
+        }
+    };
+
     const handleDownloadProtocol = async (fileId: number | null) => {
         if (!fileId) return;
 
@@ -799,18 +831,25 @@ export function CommissionsPage() {
                         saving={detailsSaving}
                         error={detailsError}
                         details={details}
+                        selectedProtocolFiles={selectedProtocolFiles}
                         onClose={() => {
                             setSelectedInn(null);
                             setDetails(null);
                             setDetailsError('');
-                            setSelectedProtocolFile(null);
+                            setSelectedProtocolFiles([]);
                         }}
                         onSave={handleSaveDetails}
                         onChange={(updater) => {
                             setDetails((prev) => (prev ? updater(prev) : prev));
                         }}
-                        onPickFile={setSelectedProtocolFile}
+                        onPickFiles={(files) => {
+                            setSelectedProtocolFiles((prev) => [...prev, ...files]);
+                        }}
+                        onRemoveSelectedFile={(index) => {
+                            setSelectedProtocolFiles((prev) => prev.filter((_, i) => i !== index));
+                        }}
                         onDownloadFile={handleDownloadProtocol}
+                        onDeleteUploadedFile={handleDeleteProtocol}
                     />
                 </>
             ) : null}

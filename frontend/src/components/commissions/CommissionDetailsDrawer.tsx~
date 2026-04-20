@@ -485,65 +485,36 @@ export function CommissionDetailsDrawer({
 
                             <Section>
                                 <SectionTitle>Файл протокола</SectionTitle>
-
                                 <FileRow>
                                     {(details.file.items ?? []).length ? (
                                         details.file.items.map((item) => (
-                                            <div
+                                            <Button
                                                 key={item.id}
-                                                style={{
-                                                    display: 'flex',
-                                                    gap: 8,
-                                                    alignItems: 'center',
-                                                    flexWrap: 'wrap',
-                                                }}
+                                                type="button"
+                                                onClick={() => onDownloadFile(item.id)}
                                             >
-                                                <Button type="button" onClick={() => onDownloadFile(item.id)}>
-                                                    Скачать: {item.originalFilename}
-                                                </Button>
-                                                <Button type="button" onClick={() => onDeleteUploadedFile(item.id)}>
-                                                    Удалить
-                                                </Button>
-                                            </div>
+                                                Скачать: {item.originalFilename}
+                                            </Button>
                                         ))
                                     ) : (
                                         <Value>Не загружен</Value>
                                     )}
-                                </FileRow>
 
-                                {selectedProtocolFiles.length ? (
-                                    <HistoryList>
-                                        {selectedProtocolFiles.map((file, index) => (
-                                            <HistoryItem key={`${file.name}-${index}`}>
-                                                <div><b>{file.name}</b></div>
-                                                <div>{(file.size / 1024 / 1024).toFixed(2)} МБ</div>
-                                                <div style={{ marginTop: 8 }}>
-                                                    <Button type="button" onClick={() => onRemoveSelectedFile(index)}>
-                                                        Удалить из выбранных
-                                                    </Button>
-                                                </div>
-                                            </HistoryItem>
-                                        ))}
-                                    </HistoryList>
-                                ) : null}
-
-                                <FileRow>
+                                    <HiddenFileInput
+                                        id="commission-protocol-file"
+                                        type="file"
+                                        multiple
+                                        onChange={(e) => onPickFiles(Array.from(e.target.files ?? []))}
+                                    />
                                     <Button
                                         type="button"
                                         onClick={() =>
                                             document.getElementById('commission-protocol-file')?.click()
                                         }
                                     >
-                                        {(details.file.items ?? []).length ? 'Добавить / заменить файл' : 'Загрузить файл'}
+                                        {(details.file.items ?? []).length ? 'Заменить / добавить файл' : 'Загрузить файл'}
                                     </Button>
                                 </FileRow>
-
-                                <HiddenFileInput
-                                    id="commission-protocol-file"
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => onPickFiles(Array.from(e.target.files ?? []))}
-                                />
                             </Section>
 
                             <Section>
