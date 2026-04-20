@@ -696,7 +696,7 @@ async function getCommissionPreviousPeriods(inn, currentQuarter) {
             FROM periods p
                      LEFT JOIN saldo s
                                ON s.period = p.id
-                                   AND TRIM(CAST(s.inn AS CHAR)) = ?
+                                   AND ${trimInnSql('s.inn')} = ?
             WHERE p.id <> ?
             GROUP BY p.id, p.quartal, p.year
             HAVING saldo_ens IS NOT NULL OR region_debt IS NOT NULL
@@ -722,7 +722,7 @@ async function getCommissionBalances(inn, quarter) {
         MAX(CAST(knsum AS DECIMAL(18,2))) AS knsum
             FROM saldo
             WHERE period = ?
-              AND TRIM(CAST(inn AS CHAR)) = ?
+              AND ${trimInnSql('inn')} = ?
             GROUP BY DATE_FORMAT(sum_date, '%Y-%m-%d')
             ORDER BY date DESC
                 LIMIT 7
@@ -748,7 +748,7 @@ async function getLatestCommissionRow(inn, quarter) {
                 DATE_FORMAT(action_date, '%Y-%m-%d %H:%i:%s') AS action_date
             FROM commissions
             WHERE period = ?
-              AND TRIM(CAST(inn AS CHAR)) = ?
+              AND ${trimInnSql('inn')} = ?
             ORDER BY com_date DESC, id DESC
                 LIMIT 1
         `,
@@ -769,7 +769,7 @@ async function getLatestEventRow(inn, quarter) {
                 DATE_FORMAT(action_date, '%Y-%m-%d %H:%i:%s') AS action_date
             FROM events
             WHERE period = ?
-              AND TRIM(CAST(inn AS CHAR)) = ?
+              AND ${trimInnSql('inn')} = ?
             ORDER BY action_date DESC, id DESC
                 LIMIT 1
         `,
@@ -789,7 +789,7 @@ async function getLatestFileRow(inn, quarter) {
                 DATE_FORMAT(uploaded_at, '%Y-%m-%d %H:%i:%s') AS uploaded_at
             FROM files
             WHERE period = ?
-              AND TRIM(CAST(inn AS CHAR)) = ?
+              AND ${trimInnSql('inn')} = ?
             ORDER BY uploaded_at DESC, id DESC
                 LIMIT 1
         `,
@@ -831,14 +831,14 @@ export async function getCommissionDetails({
     if (latestDate) {
         const [currentRows] = await pool.query(
             `
-                SELECT
-                    MAX(CAST(saldo AS DECIMAL(18,2))) AS saldo_ens,
-                    MAX(CAST(knsum AS DECIMAL(18,2))) AS region_debt
-                FROM saldo
-                WHERE period = ?
-                  AND TRIM(CAST(inn AS CHAR)) = ?
-                  AND DATE_FORMAT(sum_date, '%Y-%m-%d') = ?
-            `,
+        SELECT
+          MAX(CAST(saldo AS DECIMAL(18,2))) AS saldo_ens,
+          MAX(CAST(knsum AS DECIMAL(18,2))) AS region_debt
+        FROM saldo
+        WHERE period = ?
+          AND ${trimInnSql('inn')} = ?
+          AND DATE_FORMAT(sum_date, '%Y-%m-%d') = ?
+      `,
             [quarter, inn, latestDate],
         );
 
@@ -955,27 +955,26 @@ export async function updateCommissionDetails({
 
         const [commissionRows] = await connection.query(
             `
-                SELECT id
-                FROM commissions
-                WHERE period = ?
-                  AND TRIM(CAST(inn AS CHAR)) = ?
-                ORDER BY com_date DESC, id DESC
-                    LIMIT 1
-            `,
+        SELECT id
+        FROM commissions
+        WHERE period = ?
+          AND ${trimInnSql('inn')} = ?
+        ORDER BY com_date DESC, id DESC
+        LIMIT 1
+      `,
             [quarter, inn],
         );
 
         if (commissionRows.length) {
             await connection.query(
                 `
-                    UPDATE commissions
-                    SET
-                        com_events = ?,
-                        com_date = ?,
-                        comment = ?,
-                        action_date = NOW()
-                    WHERE id = ?
-                `,
+          UPDATE commissions
+          SET
+            com_events = ?,
+            com_date = ?,
+            comment = ?
+          WHERE id = ?
+        `,
                 [
                     commissionStatus || null,
                     commissionDate || null,
@@ -986,16 +985,16 @@ export async function updateCommissionDetails({
         } else {
             await connection.query(
                 `
-                    INSERT INTO commissions (
-                        inn,
-                        com_events,
-                        com_date,
-                        action_date,
-                        comment,
-                        period
-                    )
-                    VALUES (?, ?, ?, NOW(), ?, ?)
-                `,
+          INSERT INTO commissions (
+            inn,
+            com_events,
+            com_date,
+            action_date,
+            comment,
+            period
+          )
+          VALUES (?, ?, ?, NOW(), ?, ?)
+        `,
                 [
                     inn,
                     commissionStatus || null,
@@ -1008,27 +1007,27 @@ export async function updateCommissionDetails({
 
         const [eventRows] = await connection.query(
             `
-                SELECT id
-                FROM events
-                WHERE period = ?
-                  AND TRIM(CAST(inn AS CHAR)) = ?
-                ORDER BY action_date DESC, id DESC
-                    LIMIT 1
-            `,
+        SELECT id
+        FROM events
+        WHERE period = ?
+          AND ${trimInnSql('inn')} = ?
+        ORDER BY action_date DESC, id DESC
+        LIMIT 1
+      `,
             [quarter, inn],
         );
 
         if (eventRows.length) {
             await connection.query(
                 `
-                    UPDATE events
-                    SET
-                        events = ?,
-                        measures = ?,
-                        administration = ?,
-                        action_date = NOW()
-                    WHERE id = ?
-                `,
+          UPDATE events
+          SET
+            events = ?,
+            measures = ?,
+            administration = ?,
+            action_date = NOW()
+          WHERE id = ?
+        `,
                 [
                     interactionStatus || null,
                     measuresValue,
@@ -1039,16 +1038,16 @@ export async function updateCommissionDetails({
         } else {
             await connection.query(
                 `
-                    INSERT INTO events (
-                        inn,
-                        events,
-                        measures,
-                        administration,
-                        action_date,
-                        period
-                    )
-                    VALUES (?, ?, ?, ?, NOW(), ?)
-                `,
+          INSERT INTO events (
+            inn,
+            events,
+            measures,
+            administration,
+            action_date,
+            period
+          )
+          VALUES (?, ?, ?, ?, NOW(), ?)
+        `,
                 [
                     inn,
                     interactionStatus || null,

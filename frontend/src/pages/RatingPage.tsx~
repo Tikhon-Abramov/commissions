@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import { FilterBar, type FilterField } from '../components/common/FilterBar';
@@ -33,92 +33,43 @@ import type {
     RatingTopMoRow,
 } from '../types/rating';
 
-type RatingViewMode = 'region' | 'oktmo';
-
 const Section = styled.section`
-    margin-top: 22px;
+  margin-top: 22px;
 `;
 
 const SectionTitle = styled.h3`
-    margin: 0 0 12px;
-    font-size: 18px;
+  margin: 0 0 12px;
+  font-size: 18px;
 `;
 
 const TwinGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 
-    @media (max-width: 980px) {
-        grid-template-columns: 1fr;
-    }
-`;
-
-const ViewSwitcher = styled.div`
-    display: flex;
-    gap: 10px;
-    margin: 18px 0 8px;
-    flex-wrap: wrap;
-`;
-
-const ViewButton = styled.button<{ $active?: boolean }>`
-    height: 40px;
-    padding: 0 16px;
-    border-radius: 12px;
-    border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.border)};
-    background: ${({ theme, $active }) => ($active ? theme.colors.primarySoft : theme.colors.surface)};
-    color: ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.text)};
-    cursor: pointer;
-    font-weight: 600;
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const TableWrap = styled.div`
-    width: 100%;
-    overflow-x: auto;
-    border: 1px solid ${({ theme }) => theme.colors.border};
-    border-radius: 18px;
-    background: ${({ theme }) => theme.colors.surface};
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 18px;
+  background: ${({ theme }) => theme.colors.surface};
 `;
 
 const Table = styled.table`
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 1880px;
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1880px;
 `;
 
 const CompactTable = styled.table`
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 100%;
-`;
-
-const RegionTable = styled.table`
   width: 100%;
   border-collapse: collapse;
   min-width: 100%;
-`;
-
-const RegionTitleRow = styled.tr`
-  th {
-    background: ${({ theme }) => theme.colors.primary};
-    color: #fff;
-    font-size: 15px;
-    font-weight: 700;
-    text-align: center;
-    padding: 14px 10px;
-    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  }
-`;
-
-const SectionRow = styled.tr`
-  td {
-    padding: 10px 12px;
-    font-size: 14px;
-    font-weight: 700;
-    color: ${({ theme }) => theme.colors.primary};
-    background: ${({ theme }) => theme.colors.surfaceAlt};
-    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  }
 `;
 
 const HeadCell = styled.th`
@@ -155,7 +106,6 @@ export function RatingPage() {
         filters,
     } = useAppSelector((state) => state.rating);
     const { isAdmin, region: userRegion } = useAppSelector((state) => state.auth);
-    const [viewMode, setViewMode] = useState<RatingViewMode>('region');
 
     useEffect(() => {
         dispatch(setRatingRegionRows(ratingRegionRows));
@@ -217,279 +167,192 @@ export function RatingPage() {
         <>
             <PageHeader
                 title="Рейтинг МО"
-                description="Структура таблиц сохранена по образцу старого сервиса, обновлён только визуальный слой."
+                description="Структура таблиц и заголовков сохранена по образцу старого сервиса, обновлён только визуальный слой."
             />
 
             <SummaryGrid metrics={summary} />
 
             <FilterBar fields={filterFields} />
 
-            <ViewSwitcher>
-                <ViewButton
-                    type="button"
-                    $active={viewMode === 'region'}
-                    onClick={() => setViewMode('region')}
-                >
-                    Рейтинг по региону
-                </ViewButton>
+            <Section>
+                <SectionTitle>Рейтинг по ОКТМО</SectionTitle>
+                <TableWrap>
+                    <Table>
+                        <thead>
+                        <tr>
+                            <HeadCell rowSpan={2}>№</HeadCell>
+                            <HeadCell rowSpan={2}>ОКТМО</HeadCell>
+                            <HeadCell rowSpan={2}>Наименование МО</HeadCell>
 
-                <ViewButton
-                    type="button"
-                    $active={viewMode === 'oktmo'}
-                    onClick={() => setViewMode('oktmo')}
-                >
-                    Рейтинг ОКТМО
-                </ViewButton>
-            </ViewSwitcher>
+                            <HeadCell colSpan={2}>Соотношение долга к поступлениям (DTI)</HeadCell>
+                            <HeadCell colSpan={2}>Доля должников БО</HeadCell>
+                            <HeadCell colSpan={2}>Доля должников в общем количестве НП</HeadCell>
+                            <HeadCell colSpan={2}>Доля НП, имеющих переплату</HeadCell>
+                            <HeadCell colSpan={2}>
+                                Доля НП БО, имеющих переплату, в общем количестве НП БО
+                            </HeadCell>
+                            <HeadCell colSpan={2}>Динамика долга за 12 месяцев</HeadCell>
+                            <HeadCell colSpan={2}>Динамика долга БО за 12 месяцев</HeadCell>
+                            <HeadCell colSpan={2}>
+                                Доля должников к сотрудникам организаций с численностью &gt;100
+                            </HeadCell>
+                            <HeadCell colSpan={2}>
+                                Доля должников к сотрудникам организаций БО с численностью &gt;100
+                            </HeadCell>
+                            <HeadCell colSpan={2}>Доля комиссий</HeadCell>
 
-            {viewMode === 'region' ? (
-                <Section>
-                    <TableWrap>
-                        <RegionTable>
-                            <thead>
-                            <RegionTitleRow>
-                                <th colSpan={6}>Рейтинг по региону</th>
-                            </RegionTitleRow>
+                            <HeadCell rowSpan={2}>Рейтинг МО</HeadCell>
+                        </tr>
+
+                        <tr>
+                            {Array.from({ length: 10 }).map((_, index) => (
+                                <Fragment key={index}>
+                                    <HeadCell>Значение</HeadCell>
+                                    <HeadCell>Место</HeadCell>
+                                </Fragment>
+                            ))}
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        {!visibleMoRows.length ? (
                             <tr>
-                                <HeadCell style={{ width: '70px' }}>№</HeadCell>
-                                <HeadCell>Показатель</HeadCell>
-                                <HeadCell style={{ width: '140px' }}>Место в рейтинге</HeadCell>
-                                <HeadCell style={{ width: '160px' }}>Значение показателя</HeadCell>
-                                <HeadCell style={{ width: '180px' }}>Среднее значение по РФ</HeadCell>
-                                <HeadCell style={{ width: '160px' }}>Передовая практика</HeadCell>
+                                <Cell colSpan={24} $align="center">
+                                    Нет данных по выбранным параметрам
+                                </Cell>
                             </tr>
-                            </thead>
+                        ) : (
+                            visibleMoRows.map((row: RatingMoRow) => (
+                                <tr key={row.id}>
+                                    <Cell $align="center">{row.id}</Cell>
+                                    <Cell>{row.oktmo}</Cell>
+                                    <Cell>{row.moName}</Cell>
 
-                            <tbody>
-                            {regionRows.map((row: RatingRegionRow, index) => {
-                                if (row.type === 'section') {
-                                    return (
-                                        <SectionRow key={`section-${index}`}>
-                                            <td colSpan={6}>{row.title}</td>
-                                        </SectionRow>
-                                    );
-                                }
+                                    <Cell $align="center">{row.dti.value}</Cell>
+                                    <Cell $align="center">{row.dti.place}</Cell>
 
-                                return (
-                                    <tr key={row.code}>
-                                        <Cell $align="center">{row.code}</Cell>
-                                        <Cell>{row.name}</Cell>
-                                        <Cell $align="center">{row.place}</Cell>
-                                        <Cell $align="right">{row.value}</Cell>
-                                        <Cell $align="right">{row.averageRf}</Cell>
-                                        <Cell $align="right">{row.bestPractice}</Cell>
-                                    </tr>
-                                );
-                            })}
-                            </tbody>
-                        </RegionTable>
-                    </TableWrap>
-                </Section>
-            ) : (
-                <>
-                    <Section>
-                        <SectionTitle>Рейтинг по ОКТМО</SectionTitle>
+                                    <Cell $align="center">{row.debtorsBudgetShare.value}</Cell>
+                                    <Cell $align="center">{row.debtorsBudgetShare.place}</Cell>
+
+                                    <Cell $align="center">{row.debtorsNpShare.value}</Cell>
+                                    <Cell $align="center">{row.debtorsNpShare.place}</Cell>
+
+                                    <Cell $align="center">{row.overpaymentNpShare.value}</Cell>
+                                    <Cell $align="center">{row.overpaymentNpShare.place}</Cell>
+
+                                    <Cell $align="center">{row.overpaymentBudgetNpShare.value}</Cell>
+                                    <Cell $align="center">{row.overpaymentBudgetNpShare.place}</Cell>
+
+                                    <Cell $align="center">{row.debt12mDynamics.value}</Cell>
+                                    <Cell $align="center">{row.debt12mDynamics.place}</Cell>
+
+                                    <Cell $align="center">{row.budgetDebt12mDynamics.value}</Cell>
+                                    <Cell $align="center">{row.budgetDebt12mDynamics.place}</Cell>
+
+                                    <Cell $align="center">{row.debtorsToEmployeesOver100.value}</Cell>
+                                    <Cell $align="center">{row.debtorsToEmployeesOver100.place}</Cell>
+
+                                    <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.value}</Cell>
+                                    <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.place}</Cell>
+
+                                    <Cell $align="center">{row.commissionsShare.value}</Cell>
+                                    <Cell $align="center">{row.commissionsShare.place}</Cell>
+
+                                    <Cell $align="center">{row.finalRating}</Cell>
+                                </tr>
+                            ))
+                        )}
+                        </tbody>
+                    </Table>
+                </TableWrap>
+            </Section>
+
+            <Section>
+                <SectionTitle>Рейтинг по региону</SectionTitle>
+                <TableWrap>
+                    <CompactTable>
+                        <thead>
+                        <tr>
+                            <HeadCell>№</HeadCell>
+                            <HeadCell>Показатель</HeadCell>
+                            <HeadCell>Место в рейтинге</HeadCell>
+                            <HeadCell>Значение показателя</HeadCell>
+                            <HeadCell>Среднее значение по РФ</HeadCell>
+                            <HeadCell>Передовая практика</HeadCell>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {regionRows.map((row: RatingRegionRow) => (
+                            <tr key={row.id}>
+                                <Cell $align="center">{row.id}</Cell>
+                                <Cell>{row.name}</Cell>
+                                <Cell $align="center">{row.place}</Cell>
+                                <Cell $align="center">{row.value}</Cell>
+                                <Cell $align="center">{row.averageRf}</Cell>
+                                <Cell>{row.bestPractice ?? '—'}</Cell>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </CompactTable>
+                </TableWrap>
+            </Section>
+
+            <Section>
+                <TwinGrid>
+                    <div>
+                        <SectionTitle>Топ-5 муниципальных образований по наивысшему рейтингу</SectionTitle>
                         <TableWrap>
-                            <Table>
+                            <CompactTable>
                                 <thead>
                                 <tr>
-                                    <HeadCell rowSpan={2}>№</HeadCell>
-                                    <HeadCell rowSpan={2}>ОКТМО</HeadCell>
-                                    <HeadCell rowSpan={2}>Наименование МО</HeadCell>
-
-                                    <HeadCell colSpan={2}>Соотношение долга к поступлениям (DTI)</HeadCell>
-                                    <HeadCell colSpan={2}>Доля должников БО</HeadCell>
-                                    <HeadCell colSpan={2}>Доля должников в общем количестве НП</HeadCell>
-                                    <HeadCell colSpan={2}>Доля НП, имеющих переплату</HeadCell>
-                                    <HeadCell colSpan={2}>
-                                        Доля НП БО, имеющих переплату, в общем количестве НП БО
-                                    </HeadCell>
-                                    <HeadCell colSpan={2}>Динамика долга за 12 месяцев</HeadCell>
-                                    <HeadCell colSpan={2}>Динамика долга БО за 12 месяцев</HeadCell>
-                                    <HeadCell colSpan={2}>
-                                        Доля должников к сотрудникам организаций с численностью &gt;100
-                                    </HeadCell>
-                                    <HeadCell colSpan={2}>
-                                        Доля должников к сотрудникам организаций БО с численностью &gt;100
-                                    </HeadCell>
-                                    <HeadCell colSpan={2}>Доля комиссий</HeadCell>
-
-                                    <HeadCell rowSpan={2}>Рейтинг МО</HeadCell>
-                                </tr>
-
-                                <tr>
-                                    {Array.from({ length: 10 }).map((_, index) => (
-                                        <Fragment key={index}>
-                                            <HeadCell>Значение</HeadCell>
-                                            <HeadCell>Место</HeadCell>
-                                        </Fragment>
-                                    ))}
+                                    <HeadCell>ОКТМО</HeadCell>
+                                    <HeadCell>Наименование МО</HeadCell>
+                                    <HeadCell>Рейтинг</HeadCell>
                                 </tr>
                                 </thead>
-
                                 <tbody>
-                                {!visibleMoRows.length ? (
-                                    <tr>
-                                        <Cell colSpan={24} $align="center">
-                                            Нет данных по выбранным параметрам
-                                        </Cell>
+                                {bestRows.map((row: RatingTopMoRow) => (
+                                    <tr key={`${row.oktmo}-${row.moName}`}>
+                                        <Cell>{row.oktmo}</Cell>
+                                        <Cell>{row.moName}</Cell>
+                                        <Cell $align="center">{row.rating}</Cell>
                                     </tr>
-                                ) : (
-                                    visibleMoRows.map((row: RatingMoRow) => (
-                                        <tr key={row.id}>
-                                            <Cell $align="center">{row.id}</Cell>
-                                            <Cell>{row.oktmo}</Cell>
-                                            <Cell>{row.moName}</Cell>
-
-                                            <Cell $align="center">{row.dti.value}</Cell>
-                                            <Cell $align="center">{row.dti.place}</Cell>
-
-                                            <Cell $align="center">{row.debtorsBudgetShare.value}</Cell>
-                                            <Cell $align="center">{row.debtorsBudgetShare.place}</Cell>
-
-                                            <Cell $align="center">{row.debtorsNpShare.value}</Cell>
-                                            <Cell $align="center">{row.debtorsNpShare.place}</Cell>
-
-                                            <Cell $align="center">{row.overpaymentNpShare.value}</Cell>
-                                            <Cell $align="center">{row.overpaymentNpShare.place}</Cell>
-
-                                            <Cell $align="center">{row.overpaymentBudgetNpShare.value}</Cell>
-                                            <Cell $align="center">{row.overpaymentBudgetNpShare.place}</Cell>
-
-                                            <Cell $align="center">{row.debt12mDynamics.value}</Cell>
-                                            <Cell $align="center">{row.debt12mDynamics.place}</Cell>
-
-                                            <Cell $align="center">{row.budgetDebt12mDynamics.value}</Cell>
-                                            <Cell $align="center">{row.budgetDebt12mDynamics.place}</Cell>
-
-                                            <Cell $align="center">{row.debtorsToEmployeesOver100.value}</Cell>
-                                            <Cell $align="center">{row.debtorsToEmployeesOver100.place}</Cell>
-
-                                            <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.value}</Cell>
-                                            <Cell $align="center">{row.budgetDebtorsToEmployeesOver100.place}</Cell>
-
-                                            <Cell $align="center">{row.commissionsShare.value}</Cell>
-                                            <Cell $align="center">{row.commissionsShare.place}</Cell>
-
-                                            <Cell $align="center">{row.finalRating}</Cell>
-                                        </tr>
-                                    ))
-                                )}
+                                ))}
                                 </tbody>
-                            </Table>
+                            </CompactTable>
                         </TableWrap>
-                    </Section>
+                    </div>
 
-                    <Section>
-                        <TwinGrid>
-                            <div>
-                                <SectionTitle>Топ-5 муниципальных образований по наивысшему рейтингу</SectionTitle>
-                                <TableWrap>
-                                    <CompactTable>
-                                        <thead>
-                                        <tr>
-                                            <HeadCell>ОКТМО</HeadCell>
-                                            <HeadCell>Наименование МО</HeadCell>
-                                            <HeadCell>Рейтинг</HeadCell>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {bestRows.map((row: RatingTopMoRow) => (
-                                            <tr key={`${row.oktmo}-${row.moName}`}>
-                                                <Cell>{row.oktmo}</Cell>
-                                                <Cell>{row.moName}</Cell>
-                                                <Cell $align="center">{row.rating}</Cell>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </CompactTable>
-                                </TableWrap>
-                            </div>
+                    <div>
+                        <SectionTitle>Топ-5 муниципальных образований по наименьшему рейтингу</SectionTitle>
+                        <TableWrap>
+                            <CompactTable>
+                                <thead>
+                                <tr>
+                                    <HeadCell>ОКТМО</HeadCell>
+                                    <HeadCell>Наименование МО</HeadCell>
+                                    <HeadCell>Рейтинг</HeadCell>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {worstRows.map((row: RatingTopMoRow) => (
+                                    <tr key={`${row.oktmo}-${row.moName}`}>
+                                        <Cell>{row.oktmo}</Cell>
+                                        <Cell>{row.moName}</Cell>
+                                        <Cell $align="center">{row.rating}</Cell>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </CompactTable>
+                        </TableWrap>
+                    </div>
+                </TwinGrid>
+            </Section>
 
-                            <div>
-                                <SectionTitle>Топ-5 муниципальных образований по наименьшему рейтингу</SectionTitle>
-                                <TableWrap>
-                                    <CompactTable>
-                                        <thead>
-                                        <tr>
-                                            <HeadCell>ОКТМО</HeadCell>
-                                            <HeadCell>Наименование МО</HeadCell>
-                                            <HeadCell>Рейтинг</HeadCell>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {worstRows.map((row: RatingTopMoRow) => (
-                                            <tr key={`${row.oktmo}-${row.moName}`}>
-                                                <Cell>{row.oktmo}</Cell>
-                                                <Cell>{row.moName}</Cell>
-                                                <Cell $align="center">{row.rating}</Cell>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </CompactTable>
-                                </TableWrap>
-                            </div>
-                        </TwinGrid>
-                    </Section>
-
-                    <Section>
-                        <TwinGrid>
-                            <div>
-                                <SectionTitle>Топ должников</SectionTitle>
-                                <TableWrap>
-                                    <CompactTable>
-                                        <thead>
-                                        <tr>
-                                            <HeadCell>Место</HeadCell>
-                                            <HeadCell>ОКТМО</HeadCell>
-                                            <HeadCell>Наименование НП</HeadCell>
-                                            <HeadCell>Сумма долга, тыс.руб.</HeadCell>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {debtorsRows.map((row: RatingTopDebtorRow) => (
-                                            <tr key={`${row.place}-${row.name}`}>
-                                                <Cell $align="center">{row.place}</Cell>
-                                                <Cell>{row.oktmo}</Cell>
-                                                <Cell>{row.name}</Cell>
-                                                <Cell $align="right">{formatAmount(row.debtAmount)}</Cell>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </CompactTable>
-                                </TableWrap>
-                            </div>
-
-                            <div>
-                                <SectionTitle>Топ должников бюджетных организаций</SectionTitle>
-                                <TableWrap>
-                                    <CompactTable>
-                                        <thead>
-                                        <tr>
-                                            <HeadCell>Место</HeadCell>
-                                            <HeadCell>ОКТМО</HeadCell>
-                                            <HeadCell>Наименование НП</HeadCell>
-                                            <HeadCell>Сумма долга, тыс.руб.</HeadCell>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {budgetDebtorsRows.map((row: RatingTopDebtorRow) => (
-                                            <tr key={`${row.place}-${row.name}`}>
-                                                <Cell $align="center">{row.place}</Cell>
-                                                <Cell>{row.oktmo}</Cell>
-                                                <Cell>{row.name}</Cell>
-                                                <Cell $align="right">{formatAmount(row.debtAmount)}</Cell>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </CompactTable>
-                                </TableWrap>
-                            </div>
-                        </TwinGrid>
-                    </Section>
-
-                    <Section>
-                        <SectionTitle>Топ должников 2-го уровня</SectionTitle>
+            <Section>
+                <TwinGrid>
+                    <div>
+                        <SectionTitle>Топ должников</SectionTitle>
                         <TableWrap>
                             <CompactTable>
                                 <thead>
@@ -497,26 +360,78 @@ export function RatingPage() {
                                     <HeadCell>Место</HeadCell>
                                     <HeadCell>ОКТМО</HeadCell>
                                     <HeadCell>Наименование НП</HeadCell>
-                                    <HeadCell>Доля должников</HeadCell>
                                     <HeadCell>Сумма долга, тыс.руб.</HeadCell>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {secondLevelRows.map((row: RatingTopDebtorSecondLevelRow) => (
+                                {debtorsRows.map((row: RatingTopDebtorRow) => (
                                     <tr key={`${row.place}-${row.name}`}>
                                         <Cell $align="center">{row.place}</Cell>
                                         <Cell>{row.oktmo}</Cell>
                                         <Cell>{row.name}</Cell>
-                                        <Cell $align="center">{row.debtorsShare}</Cell>
                                         <Cell $align="right">{formatAmount(row.debtAmount)}</Cell>
                                     </tr>
                                 ))}
                                 </tbody>
                             </CompactTable>
                         </TableWrap>
-                    </Section>
-                </>
-            )}
+                    </div>
+
+                    <div>
+                        <SectionTitle>Топ должников бюджетных организаций</SectionTitle>
+                        <TableWrap>
+                            <CompactTable>
+                                <thead>
+                                <tr>
+                                    <HeadCell>Место</HeadCell>
+                                    <HeadCell>ОКТМО</HeadCell>
+                                    <HeadCell>Наименование НП</HeadCell>
+                                    <HeadCell>Сумма долга, тыс.руб.</HeadCell>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {budgetDebtorsRows.map((row: RatingTopDebtorRow) => (
+                                    <tr key={`${row.place}-${row.name}`}>
+                                        <Cell $align="center">{row.place}</Cell>
+                                        <Cell>{row.oktmo}</Cell>
+                                        <Cell>{row.name}</Cell>
+                                        <Cell $align="right">{formatAmount(row.debtAmount)}</Cell>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </CompactTable>
+                        </TableWrap>
+                    </div>
+                </TwinGrid>
+            </Section>
+
+            <Section>
+                <SectionTitle>Топ должников 2-го уровня</SectionTitle>
+                <TableWrap>
+                    <CompactTable>
+                        <thead>
+                        <tr>
+                            <HeadCell>Место</HeadCell>
+                            <HeadCell>ОКТМО</HeadCell>
+                            <HeadCell>Наименование НП</HeadCell>
+                            <HeadCell>Доля должников</HeadCell>
+                            <HeadCell>Сумма долга, тыс.руб.</HeadCell>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {secondLevelRows.map((row: RatingTopDebtorSecondLevelRow) => (
+                            <tr key={`${row.place}-${row.name}`}>
+                                <Cell $align="center">{row.place}</Cell>
+                                <Cell>{row.oktmo}</Cell>
+                                <Cell>{row.name}</Cell>
+                                <Cell $align="center">{row.debtorsShare}</Cell>
+                                <Cell $align="right">{formatAmount(row.debtAmount)}</Cell>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </CompactTable>
+                </TableWrap>
+            </Section>
         </>
     );
 }
